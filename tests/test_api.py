@@ -1,6 +1,5 @@
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # GET /tickers
 # ---------------------------------------------------------------------------
@@ -29,8 +28,8 @@ def test_list_tickers_returns_seeded_data(client, seeded_tickers):
     "symbol, expected_symbol",
     [
         ("AAPL", "AAPL"),
-        ("msft", "MSFT"),          # lowercase → uppercased
-        ("  goog  ", "GOOG"),      # whitespace stripped + uppercased
+        ("msft", "MSFT"),  # lowercase → uppercased
+        ("  goog  ", "GOOG"),  # whitespace stripped + uppercased
         ("TSLA", "TSLA"),
         ("BRK.B", "BRK.B"),
     ],
@@ -61,6 +60,7 @@ def test_add_ticker_conflict(client, symbol):
 def test_delete_existing_ticker(client, db_session, symbol):
     """Ticker created via fixture is deleted and no longer appears in list."""
     import app.repository as repo
+
     repo.create(db_session, symbol)
 
     response = client.delete(f"/tickers/{symbol}")
@@ -81,6 +81,7 @@ def test_delete_existing_ticker(client, db_session, symbol):
 def test_delete_ticker_case_insensitive(client, db_session, stored_symbol, delete_path):
     """DELETE normalises the path param to uppercase before lookup."""
     import app.repository as repo
+
     repo.create(db_session, stored_symbol)
 
     response = client.delete(f"/tickers/{delete_path}")
