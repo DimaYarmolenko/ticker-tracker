@@ -2,7 +2,7 @@
 This is a Fast API app that uses sqlalchemy and sqllite database.
 
 # Code Style
-- Use type hints
+- Use type hints as much as possible
 - Try to use enums instead of magic strings or plain values if possible.
 
 # Tests

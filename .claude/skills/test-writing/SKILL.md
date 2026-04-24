@@ -9,3 +9,4 @@ When wirting a test:
 1. Use pytest
 2. Try to use parametrised test instead of multiplying the same test to test it with different inputs.
 3. Think about execution order of tests, they should not depend on previsouly executed tests, if some data needs to be prapaired for the specific test, use fixture and clean it after the test is executed.
+4. Do not store the records to the database inside the body of the test, if you need prepaired data, create a fixture and use it in the test.
