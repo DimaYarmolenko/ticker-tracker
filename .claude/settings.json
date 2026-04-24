@@ -1,0 +1,21 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE=$(jq -r '.tool_input.file_path'); if echo \"$FILE\" | grep -q '\\.py$'; then .venv/bin/ruff check \"$FILE\" >&2 || exit 2; fi",
+            "statusMessage": "Running ruff check..."
+          },
+          {
+            "type": "command",
+            "command": "FILE=$(jq -r '.tool_input.file_path'); if echo \"$FILE\" | grep -q '\\.py$'; then .venv/bin/ruff format --check \"$FILE\" >&2 || exit 2; fi",
+            "statusMessage": "Running ruff format check..."
+          }
+        ]
+      }
+    ]
+  }
+}
