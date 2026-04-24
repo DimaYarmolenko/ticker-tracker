@@ -1,0 +1,21 @@
+services:
+  app:
+    build:
+      context: .
+      target: app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:////app/data/tickers.db
+    volumes:
+      - ticker-data:/app/data
+
+  test:
+    build:
+      context: .
+      target: test
+    profiles:
+      - test
+
+volumes:
+  ticker-data:

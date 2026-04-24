@@ -2,7 +2,24 @@
 
 A simple REST API for storing and managing stock ticker symbols, built with FastAPI and SQLite.
 
-## Setup
+## Running the app
+
+```bash
+docker compose up --build
+```
+
+The API will be available at `http://localhost:8000`.  
+Interactive docs (Swagger UI) at `http://localhost:8000/docs`.
+
+The database is stored in a Docker named volume and persists across container restarts. Only `docker compose down -v` will remove it.
+
+## Running tests
+
+```bash
+docker compose --profile test run --rm test
+```
+
+## Local development (without Docker)
 
 ```bash
 python -m venv .venv
@@ -16,14 +33,9 @@ For development (linter & formatter):
 pip install -r requirements-dev.txt
 ```
 
-## Running the app
-
 ```bash
 uvicorn app.main:app --reload
 ```
-
-The API will be available at `http://localhost:8000`.  
-Interactive docs (Swagger UI) at `http://localhost:8000/docs`.
 
 ## Endpoints
 

@@ -1,5 +1,5 @@
 # Project
-This is a Fast API app that uses sqlalchemy and sqllite database.
+This is a Fast API app (python 3.13) that uses sqlalchemy and sqllite database.
 
 # Code Style
 - Use type hints as much as possible
@@ -8,41 +8,22 @@ This is a Fast API app that uses sqlalchemy and sqllite database.
 # Tests
 The tests are located in @tests/ folder, writen with PyTest and have test database with fixtures that mimics the application database.
 
-# Setup
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+# Docker
+The app runs in Docker. The Dockerfile uses a multi-stage build:
+- `app` stage: runs the FastAPI server
+- `test` stage: runs the pytest suite in isolation
 
-For development (linter & formatter):
 ```bash
-pip install -r requirements-dev.txt
+# Build and start the app
+docker compose up --build
+
+# Run tests in a separate container
+docker compose --profile test run --rm test
 ```
+# Database
+- The SQLite database is stored in a named volume (`ticker-data`) mounted at `/app/data/tickers.db` inside the container. It persists across `docker compose down` restarts; only `docker compose down -v` removes it. The `DATABASE_URL` env var controls the DB path.
+- All tables are defined in @app/models.py, reference it if you need to know how to structure the data when you need to store the records in the DB or what type of data you can get when you read from the DB.
+
 
 # Commands
-```bash
-# Run tests
-python -m pytest tests/ -v
-```
-
-```bash
-uvicorn app.main:app --reload
-```
-
-The API will be available at `http://localhost:8000`.  
-Interactive docs (Swagger UI) at `http://localhost:8000/docs`.
-
-```bash
-# Check for lint errors
-ruff check .
-
-# Fix lint errors automatically
-ruff check --fix .
-
-# Format code
-ruff format .
-
-# Check formatting without applying changes
-ruff format --check .
-```
+See @README.md for the full list of commands to run the app, tests, and linter.
