@@ -9,6 +9,7 @@ services:
       - DATABASE_URL=sqlite:////app/data/tickers.db
     volumes:
       - ticker-data:/app/data
+    restart: unless-stopped
 
   test:
     build:
