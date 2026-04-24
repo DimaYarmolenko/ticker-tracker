@@ -1,6 +1,6 @@
 ---
 name: test-writing
-description: Writes tests. Use when creating new tests or when modifying the existing tests.
+description: Writes tests. Use when creating new tests or when modifying the existing tests, you can also reference it when you need to review the test code in a pull request.
 ---
 Test are located under @tests/ folder, create a folder if there if it does not exist.
 For tests that are require stored data use the test database with the same schema as the prodution database, create the test db if does not exist yet.
