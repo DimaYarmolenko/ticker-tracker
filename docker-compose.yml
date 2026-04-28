@@ -1,22 +1,49 @@
 services:
+  db:
+    image: postgres:17-alpine
+    env_file: .env
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
   app:
     build:
       context: .
       target: app
     ports:
       - "8000:8000"
-    environment:
-      - DATABASE_URL=sqlite:////app/data/tickers.db
-    volumes:
-      - ticker-data:/app/data
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
+
+  test-db:
+    image: postgres:17-alpine
+    env_file: .test.env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    profiles:
+      - test
 
   test:
     build:
       context: .
       target: test
+    env_file: .test.env
+    depends_on:
+      test-db:
+        condition: service_healthy
     profiles:
       - test
 
 volumes:
-  ticker-data:
+  postgres-data:

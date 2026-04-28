@@ -1,6 +1,6 @@
 # Ticker Tracker
 
-A simple REST API for storing and managing stock ticker symbols, built with FastAPI and SQLite.
+A simple REST API for storing and managing stock ticker symbols, built with FastAPI and PostgreSQL.
 
 ## Running the app
 
@@ -11,7 +11,7 @@ docker compose up --build
 The API will be available at `http://localhost:8000`.  
 Interactive docs (Swagger UI) at `http://localhost:8000/docs`.
 
-The database is stored in a Docker named volume and persists across container restarts. Only `docker compose down -v` will remove it.
+The PostgreSQL database persists in a named Docker volume (`postgres-data`) across container restarts. Only `docker compose down -v` will remove it.
 
 ## Running tests
 
