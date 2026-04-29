@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class ArticleResponse(BaseModel):
@@ -21,6 +21,11 @@ class ArticleListResponse(BaseModel):
     limit: int
     offset: int
     articles: list[ArticleResponse]
+
+
+class NewsQueryParams(BaseModel):
+    limit: int = Field(default=20, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
 
 
 class TickerCreate(BaseModel):

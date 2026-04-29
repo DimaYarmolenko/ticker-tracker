@@ -1,6 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import Annotated, AsyncGenerator
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 import app.repository as repo
 from app.database import Base, engine, get_db
 from app.scheduler import start_scheduler, stop_scheduler
-from app.schemas import ArticleListResponse, ArticleResponse, TickerCreate, TickerResponse
+from app.schemas import ArticleListResponse, ArticleResponse, NewsQueryParams, TickerCreate, TickerResponse
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,8 +56,7 @@ def delete_ticker(symbol: str, db: Session = Depends(get_db)):
 @app.get("/tickers/{symbol}/news", response_model=ArticleListResponse)
 def get_ticker_news(
     symbol: str,
-    limit: int = Query(default=20, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
+    pagination: Annotated[NewsQueryParams, Query()],
     db: Session = Depends(get_db),
 ):
     symbol = symbol.upper()
@@ -67,12 +66,12 @@ def get_ticker_news(
             detail=f"{symbol} not found",
         )
     total = repo.count_articles_by_symbol(db, symbol)
-    articles = repo.get_articles_by_symbol(db, symbol, limit=limit, offset=offset)
+    articles = repo.get_articles_by_symbol(db, symbol, limit=pagination.limit, offset=pagination.offset)
     return ArticleListResponse(
         ticker=symbol,
         total=total,
-        limit=limit,
-        offset=offset,
+        limit=pagination.limit,
+        offset=pagination.offset,
         articles=[
             ArticleResponse(
                 id=article.id,
