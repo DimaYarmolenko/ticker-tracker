@@ -61,3 +61,29 @@ def seeded_tickers(db_session: Session) -> list[Ticker]:
     ticker_a = repo.create(db_session, "AAPL")
     ticker_b = repo.create(db_session, "MSFT")
     return [ticker_a, ticker_b]
+
+
+@pytest.fixture
+def seeded_articles(db_session: Session, seeded_tickers: list[Ticker]) -> None:
+    """Pre-populate the database with articles linked to tickers."""
+    from datetime import datetime, timezone
+
+    articles_data = [
+        {
+            "url": "https://example.com/apple-article",
+            "title": "AAPL hits new high",
+            "summary": "Apple stock climbs on strong earnings.",
+            "source": "TestSource",
+            "published_at": datetime(2026, 4, 28, 10, 0, 0, tzinfo=timezone.utc),
+            "ticker_symbols": ["AAPL"],
+        },
+        {
+            "url": "https://example.com/tech-giants-article",
+            "title": "Tech giants rally",
+            "summary": "Both AAPL and MSFT post gains.",
+            "source": "TestSource",
+            "published_at": datetime(2026, 4, 28, 12, 0, 0, tzinfo=timezone.utc),
+            "ticker_symbols": ["AAPL", "MSFT"],
+        },
+    ]
+    repo.upsert_articles(db_session, articles_data)
