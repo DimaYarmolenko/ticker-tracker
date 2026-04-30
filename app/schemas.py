@@ -1,6 +1,31 @@
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
+
+
+class ArticleResponse(BaseModel):
+    id: str
+    url: str
+    title: str
+    summary: str | None
+    source: str | None
+    published_at: datetime | None
+    fetched_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ArticleListResponse(BaseModel):
+    ticker: str
+    total: int
+    limit: int
+    offset: int
+    articles: list[ArticleResponse]
+
+
+class NewsQueryParams(BaseModel):
+    limit: int = Field(default=20, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
 
 
 class TickerCreate(BaseModel):

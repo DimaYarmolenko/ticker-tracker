@@ -21,5 +21,10 @@ The app runs in Docker. The Dockerfile uses a multi-stage build:
 - The test database runs in a separate `test-db` service (profile: `test`) with no named volume — it is ephemeral and discarded when the test container exits. The `TEST_DATABASE_URL` env var controls the test connection string.
 - All tables are defined in @app/models.py, reference it if you need to know how to structure the data when you need to store the records in the DB or what type of data you can get when you read from the DB.
 
+# News collection
+- On startup, `app/scheduler.py` launches a `BackgroundScheduler` (APScheduler) that calls `app/news_fetcher.py` every `NEWS_POLL_INTERVAL_MINUTES` minutes (default 30). The first poll fires immediately on startup.
+- `app/news_fetcher.py` fetches Google News RSS for each tracked ticker, filters articles older than `NEWS_MAX_AGE_DAYS` days, deduplicates by URL, and detects cross-mentions of other tracked symbols in article titles.
+- Articles are stored in the `articles` table. The `article_tickers` join table handles the many-to-many relationship between articles and tickers.
+
 # Commands
 See @README.md for the full list of commands to run the app, tests, and linter. There is also a @Makefile that contains the most used commands.
