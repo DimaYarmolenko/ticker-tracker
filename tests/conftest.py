@@ -1,5 +1,6 @@
 import os
 from collections.abc import Generator
+from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -66,8 +67,6 @@ def seeded_tickers(db_session: Session) -> list[Ticker]:
 @pytest.fixture
 def seeded_articles(db_session: Session, seeded_tickers: list[Ticker]) -> None:
     """Pre-populate the database with articles linked to tickers."""
-    from datetime import datetime, timezone
-
     articles_data = [
         {
             "url": "https://example.com/apple-article",

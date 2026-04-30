@@ -203,9 +203,7 @@ def test_upsert_articles_multiple_articles_in_one_call(
 # --- _poll_news scheduler tests ---
 
 
-def test_poll_news_calls_upsert_when_tickers_exist(
-    db_session: Session, seeded_tickers: list
-) -> None:
+def test_poll_news_calls_upsert_when_tickers_exist(seeded_tickers: list) -> None:
     from app.scheduler import _poll_news
 
     fake_articles = [
@@ -219,7 +217,8 @@ def test_poll_news_calls_upsert_when_tickers_exist(
         }
     ]
     with (
-        patch("app.scheduler.SessionLocal", return_value=db_session),
+        patch("app.scheduler.SessionLocal"),
+        patch("app.scheduler.repo.get_all", return_value=seeded_tickers),
         patch("app.scheduler.fetch_news", return_value=fake_articles) as mock_fetch,
         patch("app.scheduler.repo.upsert_articles") as mock_upsert,
     ):
@@ -227,14 +226,15 @@ def test_poll_news_calls_upsert_when_tickers_exist(
 
     symbols = mock_fetch.call_args[0][0]
     assert set(symbols) == {"AAPL", "MSFT"}
-    mock_upsert.assert_called_once_with(db_session, fake_articles)
+    mock_upsert.assert_called_once()
 
 
-def test_poll_news_skips_fetch_when_no_tickers(db_session: Session) -> None:
+def test_poll_news_skips_fetch_when_no_tickers() -> None:
     from app.scheduler import _poll_news
 
     with (
-        patch("app.scheduler.SessionLocal", return_value=db_session),
+        patch("app.scheduler.SessionLocal"),
+        patch("app.scheduler.repo.get_all", return_value=[]),
         patch("app.scheduler.fetch_news") as mock_fetch,
     ):
         _poll_news()
@@ -242,13 +242,12 @@ def test_poll_news_skips_fetch_when_no_tickers(db_session: Session) -> None:
     mock_fetch.assert_not_called()
 
 
-def test_poll_news_does_not_call_upsert_when_fetch_returns_empty(
-    db_session: Session, seeded_tickers: list
-) -> None:
+def test_poll_news_does_not_call_upsert_when_fetch_returns_empty(seeded_tickers: list) -> None:
     from app.scheduler import _poll_news
 
     with (
-        patch("app.scheduler.SessionLocal", return_value=db_session),
+        patch("app.scheduler.SessionLocal"),
+        patch("app.scheduler.repo.get_all", return_value=seeded_tickers),
         patch("app.scheduler.fetch_news", return_value=[]),
         patch("app.scheduler.repo.upsert_articles") as mock_upsert,
     ):

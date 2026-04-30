@@ -1,6 +1,18 @@
-from sqlalchemy.orm import Session
+from datetime import datetime
+from typing import TypedDict
+
+from sqlalchemy.orm import Query, Session
 
 from app.models import Article, Ticker, article_tickers
+
+
+class ArticleData(TypedDict):
+    url: str
+    title: str
+    summary: str | None
+    source: str | None
+    published_at: datetime | None
+    ticker_symbols: list[str]
 
 
 def get_all(db: Session) -> list[Ticker]:
@@ -28,12 +40,12 @@ def get_article_by_url(db: Session, url: str) -> Article | None:
     return db.query(Article).filter(Article.url == url).first()
 
 
-def _articles_for_ticker_query(db: Session, ticker_id: str):
+def _articles_for_ticker_query(db: Session, ticker_id: str) -> Query[Article]:
     return (
         db.query(Article)
         .join(article_tickers, Article.id == article_tickers.c.article_id)
         .filter(article_tickers.c.ticker_id == ticker_id)
-        .order_by(Article.published_at.desc())
+        .order_by(Article.published_at.desc().nulls_last())
     )
 
 
@@ -53,7 +65,7 @@ def count_articles_by_symbol(db: Session, symbol: str) -> int:
     return _articles_for_ticker_query(db, ticker.id).count()
 
 
-def upsert_articles(db: Session, articles_data: list[dict]) -> None:
+def upsert_articles(db: Session, articles_data: list[ArticleData]) -> None:
     for data in articles_data:
         existing = get_article_by_url(db, data["url"])
         if existing:

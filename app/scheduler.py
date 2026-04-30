@@ -37,7 +37,14 @@ def _poll_news() -> None:
 
 def start_scheduler() -> None:
     global _scheduler
-    interval = int(os.getenv("NEWS_POLL_INTERVAL_MINUTES", "30"))
+    if not (raw := os.getenv("NEWS_POLL_INTERVAL_MINUTES")):
+        raise ValueError("NEWS_POLL_INTERVAL_MINUTES env var is required")
+    try:
+        interval = int(raw)
+    except ValueError:
+        raise ValueError(
+            f"NEWS_POLL_INTERVAL_MINUTES must be a valid integer, got: {raw!r}"
+        ) from None
     _scheduler = BackgroundScheduler()
     _scheduler.add_job(
         _poll_news,

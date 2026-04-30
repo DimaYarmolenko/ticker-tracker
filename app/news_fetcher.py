@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 import feedparser
 import httpx
 
+from app.repository import ArticleData
+
 logger = logging.getLogger(__name__)
 
 _GOOGLE_NEWS_RSS_URL = "https://news.google.com/rss/search"
@@ -31,21 +33,13 @@ def _parse_entry(entry: dict) -> tuple[str, str, str | None, str | None, datetim
     return url, title, summary, source, published_at
 
 
-def fetch_news(symbols: list[str]) -> list[dict]:
-    """
-    Fetch recent news articles for the given ticker symbols via Google News RSS.
-    Articles older than NEWS_MAX_AGE_DAYS are skipped.
-    Duplicate URLs across multiple ticker fetches are merged into a single article
-    with all relevant tickers. Article titles are also scanned for cross-mentions
-    of other tracked symbols.
-    Returns a list of dicts ready for repository.upsert_articles().
-    """
+def fetch_news(symbols: list[str]) -> list[ArticleData]:
     if not symbols:
         return []
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=_get_max_age_days())
     symbols_set = set(symbols)
-    seen: dict[str, dict] = {}
+    seen: dict[str, ArticleData] = {}
 
     for symbol in symbols:
         params = {
