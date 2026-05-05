@@ -11,9 +11,8 @@ from app.scheduler import start_scheduler, stop_scheduler
 from app.schemas import (
     ArticleListResponse,
     ArticleResponse,
-    NewsQueryParams,
+    PaginationParams,
     PriceListResponse,
-    PriceQueryParams,
     PriceResponse,
     TickerCreate,
     TickerResponse,
@@ -65,7 +64,7 @@ def delete_ticker(symbol: str, db: Session = Depends(get_db)):
 @app.get("/tickers/{symbol}/news", response_model=ArticleListResponse)
 def get_ticker_news(
     symbol: str,
-    pagination: Annotated[NewsQueryParams, Query()],
+    pagination: Annotated[PaginationParams, Query()],
     db: Session = Depends(get_db),
 ):
     symbol = symbol.upper()
@@ -101,7 +100,7 @@ def get_ticker_news(
 @app.get("/tickers/{symbol}/prices", response_model=PriceListResponse)
 def get_ticker_prices(
     symbol: str,
-    pagination: Annotated[PriceQueryParams, Query()],
+    pagination: Annotated[PaginationParams, Query()],
     db: Session = Depends(get_db),
 ):
     symbol = symbol.upper()

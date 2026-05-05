@@ -23,7 +23,7 @@ class ArticleListResponse(BaseModel):
     articles: list[ArticleResponse]
 
 
-class NewsQueryParams(BaseModel):
+class PaginationParams(BaseModel):
     limit: int = Field(default=20, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
 
@@ -34,10 +34,6 @@ class PriceBase(BaseModel):
     high: float | None
     low: float | None
     volume: int | None
-
-
-class PriceData(PriceBase):
-    symbol: str
 
 
 class PriceResponse(PriceBase):
@@ -53,11 +49,6 @@ class PriceListResponse(BaseModel):
     limit: int
     offset: int
     prices: list[PriceResponse]
-
-
-class PriceQueryParams(BaseModel):
-    limit: int = Field(default=20, ge=1, le=100)
-    offset: int = Field(default=0, ge=0)
 
 
 class TickerCreate(BaseModel):

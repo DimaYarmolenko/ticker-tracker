@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 import app.repository as repo
 from app.models import Price, Ticker
+from app.repository import PriceData
 from app.scheduler import _poll_prices
-from app.schemas import PriceData
 
 
 class TestGetTickerPricesEndpoint:

@@ -16,45 +16,75 @@ _scheduler: BackgroundScheduler | None = None
 
 
 def _poll_news() -> None:
-    db: Session = SessionLocal()
+    ticket_session_db: Session = SessionLocal()
     try:
-        tickers = repo.get_all(db)
+        tickers = repo.get_all(ticket_session_db)
         symbols = [t.symbol for t in tickers]
-        if not symbols:
-            logger.debug("No tickers tracked; skipping news poll")
-            return
-        logger.info("Polling news for %d ticker(s): %s", len(symbols), symbols)
-        articles = fetch_news(symbols)
-        if articles:
-            repo.upsert_articles(db, articles)
-            logger.info("Upserted %d article(s)", len(articles))
-        else:
-            logger.debug("No new articles found")
     except Exception:
-        logger.exception("Unexpected error during news poll")
+        logger.exception("Unexpected error reading tickers during news poll")
+        return
     finally:
-        db.close()
+        ticket_session_db.close()
+
+    if not symbols:
+        logger.debug("No tickers tracked; skipping news poll")
+        return
+
+    logger.info("Polling news for %d ticker(s): %s", len(symbols), symbols)
+    try:
+        articles = fetch_news(symbols)
+    except Exception:
+        logger.exception("Unexpected error fetching news")
+        return
+
+    if not articles:
+        logger.debug("No new articles found")
+        return
+
+    articles_session_db: Session = SessionLocal()
+    try:
+        repo.upsert_articles(articles_session_db, articles)
+        logger.info("Upserted %d article(s)", len(articles))
+    except Exception:
+        logger.exception("Unexpected error upserting articles during news poll")
+    finally:
+        articles_session_db.close()
 
 
 def _poll_prices() -> None:
-    db: Session = SessionLocal()
+    ticker_session_db: Session = SessionLocal()
     try:
-        tickers = repo.get_all(db)
+        tickers = repo.get_all(ticker_session_db)
         symbols = [t.symbol for t in tickers]
-        if not symbols:
-            logger.debug("No tickers tracked; skipping price poll")
-            return
-        logger.info("Polling prices for %d ticker(s): %s", len(symbols), symbols)
-        prices = fetch_prices(symbols)
-        if prices:
-            repo.insert_prices(db, prices)
-            logger.info("Inserted %d price snapshot(s)", len(prices))
-        else:
-            logger.debug("No price data fetched")
     except Exception:
-        logger.exception("Unexpected error during price poll")
+        logger.exception("Unexpected error reading tickers during price poll")
+        return
     finally:
-        db.close()
+        ticker_session_db.close()
+
+    if not symbols:
+        logger.debug("No tickers tracked; skipping price poll")
+        return
+
+    logger.info("Polling prices for %d ticker(s): %s", len(symbols), symbols)
+    try:
+        prices = fetch_prices(symbols)
+    except Exception:
+        logger.exception("Unexpected error fetching prices")
+        return
+
+    if not prices:
+        logger.debug("No price data fetched")
+        return
+
+    prices_session_db: Session = SessionLocal()
+    try:
+        repo.insert_prices(prices_session_db, prices)
+        logger.info("Inserted %d price snapshot(s)", len(prices))
+    except Exception:
+        logger.exception("Unexpected error inserting prices during price poll")
+    finally:
+        prices_session_db.close()
 
 
 def start_scheduler() -> None:

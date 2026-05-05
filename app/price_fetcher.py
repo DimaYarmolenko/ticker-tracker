@@ -3,7 +3,7 @@ import math
 
 import yfinance as yf
 
-from app.schemas import PriceData
+from app.repository import PriceData
 
 logger = logging.getLogger(__name__)
 

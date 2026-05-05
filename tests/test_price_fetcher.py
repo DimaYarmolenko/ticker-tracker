@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock, patch
 
 from app.price_fetcher import fetch_prices
-from app.schemas import PriceData
 
 
 def _make_fast_info(
@@ -39,13 +38,13 @@ def test_returns_price_data_for_valid_symbol(mock_tickers):
     mock_tickers.return_value = _make_tickers_mock({"AAPL": _make_fast_info()})
     result = fetch_prices(["AAPL"])
     assert len(result) == 1
-    assert isinstance(result[0], PriceData)
-    assert result[0].symbol == "AAPL"
-    assert result[0].price == 175.50
-    assert result[0].open == 174.00
-    assert result[0].high == 176.00
-    assert result[0].low == 173.50
-    assert result[0].volume == 55_000_000
+    assert "symbol" in result[0]
+    assert result[0]["symbol"] == "AAPL"
+    assert result[0]["price"] == 175.50
+    assert result[0]["open"] == 174.00
+    assert result[0]["high"] == 176.00
+    assert result[0]["low"] == 173.50
+    assert result[0]["volume"] == 55_000_000
 
 
 @patch("app.price_fetcher.yf.Tickers")
@@ -71,8 +70,8 @@ def test_optional_fields_none_when_nan(mock_tickers):
     )
     result = fetch_prices(["AAPL"])
     assert len(result) == 1
-    assert result[0].open is None
-    assert result[0].high is None
+    assert result[0]["open"] is None
+    assert result[0]["high"] is None
 
 
 @patch("app.price_fetcher.yf.Tickers")
@@ -89,7 +88,7 @@ def test_continues_after_one_symbol_exception(mock_tickers):
     mock_tickers.return_value = tickers_mock
     result = fetch_prices(["AAPL", "MSFT"])
     assert len(result) == 1
-    assert result[0].symbol == "AAPL"
+    assert result[0]["symbol"] == "AAPL"
 
 
 @patch("app.price_fetcher.yf.Tickers")
