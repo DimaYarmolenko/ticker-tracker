@@ -23,5 +23,6 @@ RUN pip install --no-cache-dir -r requirements-dev.txt
 
 COPY app/ ./app/
 COPY tests/ ./tests/
+COPY pyproject.toml .
 
 CMD ["python", "-m", "pytest", "tests/", "-v"]

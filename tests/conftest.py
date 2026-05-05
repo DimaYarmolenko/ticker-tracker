@@ -11,6 +11,7 @@ import app.repository as repo
 from app.database import Base, get_db
 from app.main import app
 from app.models import Ticker
+from app.repository import PriceData
 
 TEST_DATABASE_URL = (
     f"postgresql://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}"
@@ -86,3 +87,37 @@ def seeded_articles(db_session: Session, seeded_tickers: list[Ticker]) -> None:
         },
     ]
     repo.upsert_articles(db_session, articles_data)
+
+
+@pytest.fixture
+def seeded_prices(db_session: Session, seeded_tickers: list[Ticker]) -> None:
+    """Pre-populate the database with price snapshots for seeded tickers."""
+    repo.insert_prices(
+        db_session,
+        [
+            PriceData(
+                symbol="AAPL",
+                price=175.50,
+                open=174.00,
+                high=176.00,
+                low=173.50,
+                volume=55_000_000,
+            ),
+            PriceData(
+                symbol="AAPL",
+                price=176.20,
+                open=175.50,
+                high=177.00,
+                low=175.00,
+                volume=60_000_000,
+            ),
+            PriceData(
+                symbol="MSFT",
+                price=420.10,
+                open=418.00,
+                high=421.00,
+                low=417.50,
+                volume=22_000_000,
+            ),
+        ],
+    )
