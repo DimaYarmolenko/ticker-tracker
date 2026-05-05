@@ -28,6 +28,38 @@ class NewsQueryParams(BaseModel):
     offset: int = Field(default=0, ge=0)
 
 
+class PriceBase(BaseModel):
+    price: float
+    open: float | None
+    high: float | None
+    low: float | None
+    volume: int | None
+
+
+class PriceData(PriceBase):
+    symbol: str
+
+
+class PriceResponse(PriceBase):
+    id: str
+    fetched_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PriceListResponse(BaseModel):
+    ticker: str
+    total: int
+    limit: int
+    offset: int
+    prices: list[PriceResponse]
+
+
+class PriceQueryParams(BaseModel):
+    limit: int = Field(default=20, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
+
+
 class TickerCreate(BaseModel):
     symbol: str
 

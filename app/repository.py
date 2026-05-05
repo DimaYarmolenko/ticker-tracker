@@ -3,7 +3,8 @@ from typing import TypedDict
 
 from sqlalchemy.orm import Query, Session
 
-from app.models import Article, Ticker, article_tickers
+from app.models import Article, Price, Ticker, article_tickers
+from app.schemas import PriceData
 
 
 class ArticleData(TypedDict):
@@ -91,3 +92,39 @@ def _attach_tickers(db: Session, article: Article, symbols: list[str]) -> None:
             ticker = get_by_symbol(db, symbol)
             if ticker:
                 article.tickers.append(ticker)
+
+
+def _prices_for_ticker_query(db: Session, ticker_id: str) -> Query[Price]:
+    return db.query(Price).filter(Price.ticker_id == ticker_id).order_by(Price.fetched_at.desc())
+
+
+def get_prices_by_symbol(db: Session, symbol: str, limit: int = 20, offset: int = 0) -> list[Price]:
+    ticker = get_by_symbol(db, symbol)
+    if ticker is None:
+        return []
+    return _prices_for_ticker_query(db, ticker.id).offset(offset).limit(limit).all()
+
+
+def count_prices_by_symbol(db: Session, symbol: str) -> int:
+    ticker = get_by_symbol(db, symbol)
+    if ticker is None:
+        return 0
+    return _prices_for_ticker_query(db, ticker.id).count()
+
+
+def insert_prices(db: Session, prices_data: list[PriceData]) -> None:
+    for data in prices_data:
+        ticker = get_by_symbol(db, data.symbol)
+        if ticker is None:
+            continue
+        db.add(
+            Price(
+                ticker_id=ticker.id,
+                price=data.price,
+                open=data.open,
+                high=data.high,
+                low=data.low,
+                volume=data.volume,
+            )
+        )
+    db.commit()
