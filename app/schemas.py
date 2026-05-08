@@ -30,10 +30,10 @@ class PaginationParams(BaseModel):
 
 class PriceBase(BaseModel):
     price: float
-    open: float | None
-    high: float | None
-    low: float | None
-    volume: int | None
+    open: float | None = None
+    high: float | None = None
+    low: float | None = None
+    volume: int | None = None
 
 
 class PriceResponse(PriceBase):

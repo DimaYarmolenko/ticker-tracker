@@ -1,20 +1,9 @@
-# Project
-This is a FastAPI app (Python 3.13) that uses SQLAlchemy and a PostgreSQL database.
-
 # Code Style
 - Use type hints as much as possible
 - Try to use enums instead of magic strings or plain values if possible.
 
-# Tests
-The tests are located in @tests/ folder, writen with PyTest and have test database with fixtures that mimics the application database.
-
 # Configuration and secrets
 There are example files @.env.example and @.test.env.example where you can see what configs and secrets are required to run the app, but the real values are hidden from you, you do not need to know them.
-
-# Docker
-The app runs in Docker. The Dockerfile uses a multi-stage build:
-- `app` stage: runs the FastAPI server
-- `test` stage: runs the pytest suite in isolation
 
 # Database
 - The main database runs in a `db` Docker service (`postgres:17-alpine`). Data persists in a named volume (`postgres-data`) mounted at `/var/lib/postgresql/data`. It survives `docker compose down`; only `docker compose down -v` removes it. The `DATABASE_URL` env var controls the connection string.
@@ -27,4 +16,11 @@ The app runs in Docker. The Dockerfile uses a multi-stage build:
 - Articles are stored in the `articles` table. The `article_tickers` join table handles the many-to-many relationship between articles and tickers.
 
 # Commands
-See @README.md for the full list of commands to run the app, tests, and linter. There is also a @Makefile that contains the most used commands.
+Most common commands, try to use them instead of creating your own
+- make up: start the app
+- make down: stop the app and tests
+- make test: start tests suite
+- make lint: start ruff check
+- make lint-fix: start ruff check and fix
+- make format: format the code
+- make format-check: check the code format

@@ -5,14 +5,14 @@ from app.price_fetcher import fetch_prices
 
 def _make_fast_info(
     last_price=175.50,
-    open=174.00,
+    day_open=174.00,
     day_high=176.00,
     day_low=173.50,
     last_volume=55_000_000,
 ):
     info = MagicMock()
     info.last_price = last_price
-    info.open = open
+    info.open = day_open
     info.day_high = day_high
     info.day_low = day_low
     info.last_volume = last_volume
@@ -66,7 +66,7 @@ def test_skips_nan_price(mock_tickers):
 @patch("app.price_fetcher.yf.Tickers")
 def test_optional_fields_none_when_nan(mock_tickers):
     mock_tickers.return_value = _make_tickers_mock(
-        {"AAPL": _make_fast_info(open=float("nan"), day_high=float("nan"))}
+        {"AAPL": _make_fast_info(day_open=float("nan"), day_high=float("nan"))}
     )
     result = fetch_prices(["AAPL"])
     assert len(result) == 1

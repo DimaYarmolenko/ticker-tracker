@@ -68,32 +68,21 @@ def get_ticker_news(
     db: Session = Depends(get_db),
 ):
     symbol = symbol.upper()
-    if not repo.get_by_symbol(db, symbol):
+    ticker = repo.get_by_symbol(db, symbol)
+    if not ticker:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"{symbol} not found",
         )
-    total = repo.count_articles_by_symbol(db, symbol)
-    articles = repo.get_articles_by_symbol(
-        db, symbol, limit=pagination.limit, offset=pagination.offset
+    articles, total = repo.get_articles_page(
+        db, ticker.id, limit=pagination.limit, offset=pagination.offset
     )
     return ArticleListResponse(
         ticker=symbol,
         total=total,
         limit=pagination.limit,
         offset=pagination.offset,
-        articles=[
-            ArticleResponse(
-                id=article.id,
-                url=article.url,
-                title=article.title,
-                summary=article.summary,
-                source=article.source,
-                published_at=article.published_at,
-                fetched_at=article.fetched_at,
-            )
-            for article in articles
-        ],
+        articles=[ArticleResponse.model_validate(article) for article in articles],
     )
 
 
@@ -104,13 +93,15 @@ def get_ticker_prices(
     db: Session = Depends(get_db),
 ):
     symbol = symbol.upper()
-    if not repo.get_by_symbol(db, symbol):
+    ticker = repo.get_by_symbol(db, symbol)
+    if not ticker:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"{symbol} not found",
         )
-    total = repo.count_prices_by_symbol(db, symbol)
-    prices = repo.get_prices_by_symbol(db, symbol, limit=pagination.limit, offset=pagination.offset)
+    prices, total = repo.get_prices_page(
+        db, ticker.id, limit=pagination.limit, offset=pagination.offset
+    )
     return PriceListResponse(
         ticker=symbol,
         total=total,

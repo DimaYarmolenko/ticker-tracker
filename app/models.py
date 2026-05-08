@@ -60,7 +60,7 @@ class Price(Base):
     low: Mapped[float | None] = mapped_column(Float)
     volume: Mapped[int | None] = mapped_column(BigInteger)
     fetched_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     ticker: Mapped["Ticker"] = relationship("Ticker", back_populates="prices")
 

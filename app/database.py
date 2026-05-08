@@ -1,7 +1,9 @@
 import os
+from collections.abc import Generator
+from contextlib import contextmanager
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 _REQUIRED_ENV_VARS = (
     "POSTGRES_USER",
@@ -36,6 +38,15 @@ class Base(DeclarativeBase):
 
 def get_db():
     db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@contextmanager
+def db_session() -> Generator[Session, None, None]:
+    db: Session = SessionLocal()
     try:
         yield db
     finally:

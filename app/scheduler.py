@@ -1,12 +1,12 @@
 import logging
 import os
 from datetime import datetime, timezone
+from enum import StrEnum
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from sqlalchemy.orm import Session
 
 import app.repository as repo
-from app.database import SessionLocal
+from app.database import db_session
 from app.news_fetcher import fetch_news
 from app.price_fetcher import fetch_prices
 
@@ -15,16 +15,18 @@ logger = logging.getLogger(__name__)
 _scheduler: BackgroundScheduler | None = None
 
 
+class SchedulerJobId(StrEnum):
+    NEWS_POLL = "news_poll"
+    PRICE_POLL = "price_poll"
+
+
 def _poll_news() -> None:
-    ticket_session_db: Session = SessionLocal()
     try:
-        tickers = repo.get_all(ticket_session_db)
-        symbols = [t.symbol for t in tickers]
+        with db_session() as db:
+            symbols = [t.symbol for t in repo.get_all(db)]
     except Exception:
         logger.exception("Unexpected error reading tickers during news poll")
         return
-    finally:
-        ticket_session_db.close()
 
     if not symbols:
         logger.debug("No tickers tracked; skipping news poll")
@@ -41,26 +43,21 @@ def _poll_news() -> None:
         logger.debug("No new articles found")
         return
 
-    articles_session_db: Session = SessionLocal()
     try:
-        repo.upsert_articles(articles_session_db, articles)
-        logger.info("Upserted %d article(s)", len(articles))
+        with db_session() as db:
+            repo.upsert_articles(db, articles)
+            logger.info("Upserted %d article(s)", len(articles))
     except Exception:
         logger.exception("Unexpected error upserting articles during news poll")
-    finally:
-        articles_session_db.close()
 
 
 def _poll_prices() -> None:
-    ticker_session_db: Session = SessionLocal()
     try:
-        tickers = repo.get_all(ticker_session_db)
-        symbols = [t.symbol for t in tickers]
+        with db_session() as db:
+            symbols = [t.symbol for t in repo.get_all(db)]
     except Exception:
         logger.exception("Unexpected error reading tickers during price poll")
         return
-    finally:
-        ticker_session_db.close()
 
     if not symbols:
         logger.debug("No tickers tracked; skipping price poll")
@@ -77,14 +74,12 @@ def _poll_prices() -> None:
         logger.debug("No price data fetched")
         return
 
-    prices_session_db: Session = SessionLocal()
     try:
-        repo.insert_prices(prices_session_db, prices)
-        logger.info("Inserted %d price snapshot(s)", len(prices))
+        with db_session() as db:
+            repo.insert_prices(db, prices)
+            logger.info("Inserted %d price snapshot(s)", len(prices))
     except Exception:
         logger.exception("Unexpected error inserting prices during price poll")
-    finally:
-        prices_session_db.close()
 
 
 def start_scheduler() -> None:
@@ -112,14 +107,14 @@ def start_scheduler() -> None:
         _poll_news,
         "interval",
         minutes=news_interval,
-        id="news_poll",
+        id=SchedulerJobId.NEWS_POLL,
         next_run_time=datetime.now(timezone.utc),
     )
     _scheduler.add_job(
         _poll_prices,
         "interval",
         minutes=price_interval,
-        id="price_poll",
+        id=SchedulerJobId.PRICE_POLL,
         next_run_time=datetime.now(timezone.utc),
     )
     _scheduler.start()
