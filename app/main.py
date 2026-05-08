@@ -74,8 +74,7 @@ def get_ticker_news(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"{symbol} not found",
         )
-    total = repo.count_articles_by_ticker_id(db, ticker.id)
-    articles = repo.get_articles_by_ticker_id(
+    articles, total = repo.get_articles_page(
         db, ticker.id, limit=pagination.limit, offset=pagination.offset
     )
     return ArticleListResponse(
@@ -100,8 +99,7 @@ def get_ticker_prices(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"{symbol} not found",
         )
-    total = repo.count_prices_by_ticker_id(db, ticker.id)
-    prices = repo.get_prices_by_ticker_id(
+    prices, total = repo.get_prices_page(
         db, ticker.id, limit=pagination.limit, offset=pagination.offset
     )
     return PriceListResponse(

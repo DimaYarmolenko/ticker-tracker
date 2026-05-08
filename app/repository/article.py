@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import TypedDict
 
-from sqlalchemy.orm import Query, Session
+from sqlalchemy import func
+from sqlalchemy import select as sa_select
+from sqlalchemy.orm import Session
 
 from app.models import Article, article_tickers
 from app.repository.ticker import get_by_symbol
@@ -20,23 +22,33 @@ def get_article_by_url(db: Session, url: str) -> Article | None:
     return db.query(Article).filter(Article.url == url).first()
 
 
-def _articles_for_ticker_query(db: Session, ticker_id: str) -> Query[Article]:
-    return (
-        db.query(Article)
-        .join(article_tickers, Article.id == article_tickers.c.article_id)
-        .filter(article_tickers.c.ticker_id == ticker_id)
-        .order_by(Article.published_at.desc().nulls_last())
-    )
-
-
-def get_articles_by_ticker_id(
+def get_articles_page(
     db: Session, ticker_id: str, limit: int = 20, offset: int = 0
-) -> list[Article]:
-    return _articles_for_ticker_query(db, ticker_id).offset(offset).limit(limit).all()
-
-
-def count_articles_by_ticker_id(db: Session, ticker_id: str) -> int:
-    return _articles_for_ticker_query(db, ticker_id).count()
+) -> tuple[list[Article], int]:
+    count_sub = (
+        sa_select(func.count(Article.id))
+        .join(article_tickers, Article.id == article_tickers.c.article_id)
+        .where(article_tickers.c.ticker_id == ticker_id)
+        .scalar_subquery()
+    )
+    stmt = (
+        sa_select(Article, count_sub.label("total"))
+        .join(article_tickers, Article.id == article_tickers.c.article_id)
+        .where(article_tickers.c.ticker_id == ticker_id)
+        .order_by(Article.published_at.desc().nulls_last())
+        .offset(offset)
+        .limit(limit)
+    )
+    rows = db.execute(stmt).all()
+    if rows:
+        return [row[0] for row in rows], rows[0][1]
+    # Fallback when offset > total: rows is empty so count_sub is not in result
+    total = db.scalar(
+        sa_select(func.count(Article.id))
+        .join(article_tickers, Article.id == article_tickers.c.article_id)
+        .where(article_tickers.c.ticker_id == ticker_id)
+    )
+    return [], total or 0
 
 
 def upsert_articles(db: Session, articles_data: list[ArticleData]) -> None:
