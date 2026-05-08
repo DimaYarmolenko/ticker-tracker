@@ -217,7 +217,7 @@ def test_poll_news_calls_upsert_when_tickers_exist(seeded_tickers: list) -> None
         }
     ]
     with (
-        patch("app.scheduler.SessionLocal"),
+        patch("app.database.SessionLocal"),
         patch("app.scheduler.repo.get_all", return_value=seeded_tickers),
         patch("app.scheduler.fetch_news", return_value=fake_articles) as mock_fetch,
         patch("app.scheduler.repo.upsert_articles") as mock_upsert,
@@ -233,7 +233,7 @@ def test_poll_news_skips_fetch_when_no_tickers() -> None:
     from app.scheduler import _poll_news
 
     with (
-        patch("app.scheduler.SessionLocal"),
+        patch("app.database.SessionLocal"),
         patch("app.scheduler.repo.get_all", return_value=[]),
         patch("app.scheduler.fetch_news") as mock_fetch,
     ):
@@ -246,7 +246,7 @@ def test_poll_news_does_not_call_upsert_when_fetch_returns_empty(seeded_tickers:
     from app.scheduler import _poll_news
 
     with (
-        patch("app.scheduler.SessionLocal"),
+        patch("app.database.SessionLocal"),
         patch("app.scheduler.repo.get_all", return_value=seeded_tickers),
         patch("app.scheduler.fetch_news", return_value=[]),
         patch("app.scheduler.repo.upsert_articles") as mock_upsert,

@@ -146,7 +146,7 @@ class TestPollPricesScheduler:
         )
 
         with (
-            patch("app.scheduler.SessionLocal") as mock_session_local,
+            patch("app.database.SessionLocal") as mock_session_local,
             patch("app.scheduler.repo.get_all", return_value=[mock_ticker]),
             patch("app.scheduler.fetch_prices", return_value=[mock_price]) as mock_fetch,
             patch("app.scheduler.repo.insert_prices") as mock_insert,
@@ -158,7 +158,7 @@ class TestPollPricesScheduler:
 
     def test_poll_prices_skips_when_no_tickers(self) -> None:
         with (
-            patch("app.scheduler.SessionLocal") as mock_session_local,
+            patch("app.database.SessionLocal") as mock_session_local,
             patch("app.scheduler.repo.get_all", return_value=[]),
             patch("app.scheduler.fetch_prices") as mock_fetch,
         ):
@@ -171,7 +171,7 @@ class TestPollPricesScheduler:
         mock_ticker.symbol = "AAPL"
 
         with (
-            patch("app.scheduler.SessionLocal") as mock_session_local,
+            patch("app.database.SessionLocal") as mock_session_local,
             patch("app.scheduler.repo.get_all", return_value=[mock_ticker]),
             patch("app.scheduler.fetch_prices", return_value=[]),
             patch("app.scheduler.repo.insert_prices") as mock_insert,
