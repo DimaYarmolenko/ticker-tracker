@@ -6,7 +6,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 import app.repository as repo
-from app.database import Base, engine, get_db
+from app.database import get_db
 from app.scheduler import start_scheduler, stop_scheduler
 from app.schemas import (
     ArticleListResponse,
@@ -26,7 +26,6 @@ logging.basicConfig(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    Base.metadata.create_all(bind=engine)
     start_scheduler()
     yield
     stop_scheduler()
@@ -74,7 +73,7 @@ def get_ticker_news(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"{symbol} not found",
         )
-    articles, total = repo.get_articles_page(
+    rows, total = repo.get_articles_page(
         db, ticker.id, limit=pagination.limit, offset=pagination.offset
     )
     return ArticleListResponse(
@@ -82,7 +81,22 @@ def get_ticker_news(
         total=total,
         limit=pagination.limit,
         offset=pagination.offset,
-        articles=[ArticleResponse.model_validate(article) for article in articles],
+        articles=[
+            ArticleResponse(
+                id=article.id,
+                url=article.url,
+                title=article.title,
+                summary=article.summary,
+                source=article.source,
+                published_at=article.published_at,
+                fetched_at=article.fetched_at,
+                importance=article.importance,
+                evaluated_at=article.evaluated_at,
+                impact=link.impact,
+                impact_confidence=link.impact_confidence,
+            )
+            for article, link in rows
+        ],
     )
 
 

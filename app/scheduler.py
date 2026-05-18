@@ -2,11 +2,13 @@ import logging
 import os
 from datetime import datetime, timezone
 from enum import StrEnum
+from typing import Literal, overload
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
 import app.repository as repo
 from app.database import db_session
+from app.evaluator import ArticleEvaluation, Evaluator, EvaluatorInput, get_evaluator
 from app.news_fetcher import fetch_news
 from app.price_fetcher import fetch_prices
 
@@ -18,6 +20,7 @@ _scheduler: BackgroundScheduler | None = None
 class SchedulerJobId(StrEnum):
     NEWS_POLL = "news_poll"
     PRICE_POLL = "price_poll"
+    EVALUATE = "evaluate_articles"
 
 
 def _poll_news() -> None:
@@ -82,25 +85,114 @@ def _poll_prices() -> None:
         logger.exception("Unexpected error inserting prices during price poll")
 
 
+def _poll_evaluations(
+    evaluator: Evaluator, version: str, batch_size: int, max_per_run: int
+) -> None:
+    try:
+        with db_session() as db:
+            articles = repo.get_unevaluated_articles(db, limit=max_per_run)
+            if not articles:
+                logger.debug("No unevaluated articles; skipping evaluation poll")
+                return
+
+            inputs = [
+                EvaluatorInput(
+                    article_id=a.id,
+                    title=a.title,
+                    summary=a.summary,
+                    ticker_symbols=[t.symbol for t in a.tickers],
+                )
+                for a in articles
+            ]
+
+            logger.info("Evaluating %d article(s) in batches of %d", len(inputs), batch_size)
+            all_results: list[ArticleEvaluation] = []
+            for start in range(0, len(inputs), batch_size):
+                batch = inputs[start : start + batch_size]
+                all_results.extend(evaluator.evaluate(batch))
+
+            if all_results:
+                repo.save_evaluations(db, all_results, version)
+                logger.info("Persisted evaluations for %d article(s)", len(all_results))
+            else:
+                logger.warning("Evaluator returned no results for %d article(s)", len(inputs))
+    except Exception:
+        logger.exception("Unexpected error during evaluation poll")
+
+
+@overload
+def _read_int_env(name: str, *, required: Literal[True], default: int | None = None) -> int: ...
+
+
+@overload
+def _read_int_env(name: str, *, required: Literal[False], default: int) -> int: ...
+
+
+@overload
+def _read_int_env(name: str, *, required: Literal[False], default: None = None) -> int | None: ...
+
+
+def _read_int_env(name: str, *, required: bool, default: int | None = None) -> int | None:
+    raw = os.getenv(name)
+    if not raw:
+        if required:
+            raise ValueError(f"{name} env var is required")
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        raise ValueError(f"{name} must be a valid integer, got: {raw!r}") from None
+
+
+def _env_bool(name: str, *, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _register_evaluation_job(scheduler: BackgroundScheduler) -> None:
+    if not _env_bool("EVALUATOR_ENABLED", default=False):
+        logger.info("Evaluator disabled; skipping evaluation job registration")
+        return
+
+    eval_interval = _read_int_env("EVALUATION_POLL_INTERVAL_MINUTES", required=True)
+    batch_size = _read_int_env("EVALUATOR_BATCH_SIZE", required=False, default=10)
+    max_per_run = _read_int_env("EVALUATOR_MAX_PER_RUN", required=False, default=100)
+    version = os.getenv("EVALUATOR_VERSION", "v1")
+
+    try:
+        evaluator = get_evaluator()
+    except Exception:
+        logger.exception("Failed to initialize evaluator; evaluation job will not be registered")
+        return
+
+    scheduler.add_job(
+        _poll_evaluations,
+        "interval",
+        minutes=eval_interval,
+        id=SchedulerJobId.EVALUATE,
+        next_run_time=datetime.now(timezone.utc),
+        kwargs={
+            "evaluator": evaluator,
+            "version": version,
+            "batch_size": batch_size,
+            "max_per_run": max_per_run,
+        },
+    )
+    logger.info(
+        "Evaluator enabled (interval: %d min, batch: %d, max/run: %d, version: %s)",
+        eval_interval,
+        batch_size,
+        max_per_run,
+        version,
+    )
+
+
 def start_scheduler() -> None:
     global _scheduler
-    if not (raw_news := os.getenv("NEWS_POLL_INTERVAL_MINUTES")):
-        raise ValueError("NEWS_POLL_INTERVAL_MINUTES env var is required")
-    try:
-        news_interval = int(raw_news)
-    except ValueError:
-        raise ValueError(
-            f"NEWS_POLL_INTERVAL_MINUTES must be a valid integer, got: {raw_news!r}"
-        ) from None
-
-    if not (raw_price := os.getenv("PRICE_POLL_INTERVAL_MINUTES")):
-        raise ValueError("PRICE_POLL_INTERVAL_MINUTES env var is required")
-    try:
-        price_interval = int(raw_price)
-    except ValueError:
-        raise ValueError(
-            f"PRICE_POLL_INTERVAL_MINUTES must be a valid integer, got: {raw_price!r}"
-        ) from None
+    news_interval = _read_int_env("NEWS_POLL_INTERVAL_MINUTES", required=True)
+    price_interval = _read_int_env("PRICE_POLL_INTERVAL_MINUTES", required=True)
 
     _scheduler = BackgroundScheduler()
     _scheduler.add_job(
@@ -117,6 +209,7 @@ def start_scheduler() -> None:
         id=SchedulerJobId.PRICE_POLL,
         next_run_time=datetime.now(timezone.utc),
     )
+    _register_evaluation_job(_scheduler)
     _scheduler.start()
     logger.info("Scheduler started (news: %d min, prices: %d min)", news_interval, price_interval)
 

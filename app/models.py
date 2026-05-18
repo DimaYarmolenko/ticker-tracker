@@ -1,17 +1,26 @@
 import uuid
 from datetime import datetime, timezone
+from enum import StrEnum
 
-from sqlalchemy import BigInteger, Column, DateTime, Float, ForeignKey, Index, String, Table, Text
+from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
-article_tickers = Table(
-    "article_tickers",
-    Base.metadata,
-    Column("article_id", String(36), ForeignKey("articles.id"), primary_key=True),
-    Column("ticker_id", String(36), ForeignKey("tickers.id"), primary_key=True),
-)
+
+class ImpactLabel(StrEnum):
+    POSITIVE = "positive"
+    NEGATIVE = "negative"
+    NEUTRAL = "neutral"
+
+
+class ArticleTicker(Base):
+    __tablename__ = "article_tickers"
+
+    article_id: Mapped[str] = mapped_column(String(36), ForeignKey("articles.id"), primary_key=True)
+    ticker_id: Mapped[str] = mapped_column(String(36), ForeignKey("tickers.id"), primary_key=True)
+    impact: Mapped[ImpactLabel | None] = mapped_column(String(16))
+    impact_confidence: Mapped[float | None] = mapped_column(Float)
 
 
 class Ticker(Base):
@@ -23,7 +32,7 @@ class Ticker(Base):
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
     articles: Mapped[list["Article"]] = relationship(
-        "Article", secondary=article_tickers, back_populates="tickers"
+        "Article", secondary=ArticleTicker.__table__, back_populates="tickers"
     )
     prices: Mapped[list["Price"]] = relationship(
         "Price", back_populates="ticker", cascade="all, delete-orphan"
@@ -42,8 +51,11 @@ class Article(Base):
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
+    importance: Mapped[int | None] = mapped_column(Integer)
+    evaluated_at: Mapped[datetime | None] = mapped_column(DateTime)
+    evaluator_version: Mapped[str | None] = mapped_column(String(40))
     tickers: Mapped[list["Ticker"]] = relationship(
-        "Ticker", secondary=article_tickers, back_populates="articles"
+        "Ticker", secondary=ArticleTicker.__table__, back_populates="articles"
     )
 
 

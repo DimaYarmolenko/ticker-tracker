@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy import select as sa_select
 from sqlalchemy.orm import Session
 
-from app.models import Article, article_tickers
+from app.models import Article, ArticleTicker
 from app.repository.ticker import get_by_symbol
 
 
@@ -24,29 +24,28 @@ def get_article_by_url(db: Session, url: str) -> Article | None:
 
 def get_articles_page(
     db: Session, ticker_id: str, limit: int = 20, offset: int = 0
-) -> tuple[list[Article], int]:
+) -> tuple[list[tuple[Article, ArticleTicker]], int]:
     count_sub = (
         sa_select(func.count(Article.id))
-        .join(article_tickers, Article.id == article_tickers.c.article_id)
-        .where(article_tickers.c.ticker_id == ticker_id)
+        .join(ArticleTicker, Article.id == ArticleTicker.article_id)
+        .where(ArticleTicker.ticker_id == ticker_id)
         .scalar_subquery()
     )
     stmt = (
-        sa_select(Article, count_sub.label("total"))
-        .join(article_tickers, Article.id == article_tickers.c.article_id)
-        .where(article_tickers.c.ticker_id == ticker_id)
+        sa_select(Article, ArticleTicker, count_sub.label("total"))
+        .join(ArticleTicker, Article.id == ArticleTicker.article_id)
+        .where(ArticleTicker.ticker_id == ticker_id)
         .order_by(Article.published_at.desc().nulls_last())
         .offset(offset)
         .limit(limit)
     )
     rows = db.execute(stmt).all()
     if rows:
-        return [row[0] for row in rows], rows[0][1]
-    # Fallback when offset > total: rows is empty so count_sub is not in result
+        return [(row[0], row[1]) for row in rows], rows[0][2]
     total = db.scalar(
         sa_select(func.count(Article.id))
-        .join(article_tickers, Article.id == article_tickers.c.article_id)
-        .where(article_tickers.c.ticker_id == ticker_id)
+        .join(ArticleTicker, Article.id == ArticleTicker.article_id)
+        .where(ArticleTicker.ticker_id == ticker_id)
     )
     return [], total or 0
 

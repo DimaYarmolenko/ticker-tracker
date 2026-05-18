@@ -1,13 +1,16 @@
 import os
 from collections.abc import Generator
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
+from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 import app.repository as repo
+from alembic import command
 from app.database import Base, get_db
 from app.main import app
 from app.models import Ticker
@@ -18,15 +21,20 @@ TEST_DATABASE_URL = (
     f"@{os.environ['POSTGRES_HOST']}:{os.environ['POSTGRES_PORT']}/{os.environ['POSTGRES_DB']}"
 )
 
+_ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
+
 test_engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
 
 @pytest.fixture(scope="session", autouse=True)
 def create_test_db() -> Generator[None, None, None]:
-    Base.metadata.create_all(bind=test_engine)
+    cfg = Config(str(_ALEMBIC_INI))
+    command.upgrade(cfg, "head")
     yield
     Base.metadata.drop_all(bind=test_engine)
+    with test_engine.begin() as conn:
+        conn.exec_driver_sql("DROP TABLE IF EXISTS alembic_version")
 
 
 @pytest.fixture(autouse=True)
@@ -52,8 +60,7 @@ def client(db_session: Session) -> Generator[TestClient, None, None]:
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
-        yield c
+    yield TestClient(app)
     app.dependency_overrides.clear()
 
 

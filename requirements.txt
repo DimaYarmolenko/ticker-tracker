@@ -1,3 +1,4 @@
+alembic==1.18.4
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.13.0
@@ -5,6 +6,7 @@ apscheduler==3.10.4
 click==8.3.3
 fastapi==0.136.0
 feedparser==6.0.11
+google-genai==1.75.0
 h11==0.16.0
 httptools==0.7.1
 httpx==0.28.1

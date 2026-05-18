@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.models import ImpactLabel
+
 
 class ArticleResponse(BaseModel):
     id: str
@@ -11,6 +13,10 @@ class ArticleResponse(BaseModel):
     source: str | None
     published_at: datetime | None
     fetched_at: datetime
+    importance: int | None = None
+    evaluated_at: datetime | None = None
+    impact: ImpactLabel | None = None
+    impact_confidence: float | None = None
 
     model_config = {"from_attributes": True}
 

@@ -9,11 +9,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 FROM base AS app
 
 COPY app/ ./app/
+COPY alembic/ ./alembic/
+COPY alembic.ini .
 RUN mkdir -p /app/data
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
 
 
 FROM base AS test
@@ -23,6 +25,8 @@ RUN pip install --no-cache-dir -r requirements-dev.txt
 
 COPY app/ ./app/
 COPY tests/ ./tests/
+COPY alembic/ ./alembic/
+COPY alembic.ini .
 COPY pyproject.toml .
 
 CMD ["python", "-m", "pytest", "tests/", "-v"]
