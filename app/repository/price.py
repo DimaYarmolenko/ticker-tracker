@@ -20,9 +20,7 @@ def get_prices_page(
     db: Session, ticker_id: str, limit: int = 20, offset: int = 0
 ) -> tuple[list[Price], int]:
     count_sub = (
-        sa_select(func.count(Price.id))
-        .where(Price.ticker_id == ticker_id)
-        .scalar_subquery()
+        sa_select(func.count(Price.id)).where(Price.ticker_id == ticker_id).scalar_subquery()
     )
     stmt = (
         sa_select(Price, count_sub.label("total"))
@@ -35,9 +33,7 @@ def get_prices_page(
     if rows:
         return [row[0] for row in rows], rows[0][1]
     # Fallback when offset > total: rows is empty so count_sub is not in result
-    total = db.scalar(
-        sa_select(func.count(Price.id)).where(Price.ticker_id == ticker_id)
-    )
+    total = db.scalar(sa_select(func.count(Price.id)).where(Price.ticker_id == ticker_id))
     return [], total or 0
 
 

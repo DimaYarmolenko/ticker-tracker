@@ -4,6 +4,10 @@ from app.repository.article import (
     get_articles_page,
     upsert_articles,
 )
+from app.repository.evaluation import (
+    get_unevaluated_articles,
+    save_evaluations,
+)
 from app.repository.price import (
     PriceData,
     get_prices_page,
@@ -21,6 +25,8 @@ __all__ = [
     "get_articles_page",
     "get_by_symbol",
     "get_prices_page",
+    "get_unevaluated_articles",
     "insert_prices",
+    "save_evaluations",
     "upsert_articles",
 ]
