@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.evaluator import ArticleEvaluation
 from app.models import Article, ArticleTicker, Ticker
@@ -18,6 +18,7 @@ def get_unevaluated_articles(db: Session, limit: int) -> list[Article]:
         select(Article)
         .where(Article.evaluated_at.is_(None))
         .where(has_ticker)
+        .options(selectinload(Article.tickers))
         .order_by(Article.published_at.desc().nulls_last())
         .limit(limit)
     )
@@ -60,9 +61,19 @@ def save_evaluations(db: Session, results: list[ArticleEvaluation], version: str
         for impact in result.impacts:
             ticker = tickers_by_symbol.get(impact.symbol)
             if ticker is None:
+                logger.warning(
+                    "Evaluation impact for unknown ticker %s on article %s; dropping",
+                    impact.symbol,
+                    article.id,
+                )
                 continue
             link = links_by_key.get((article.id, ticker.id))
             if link is None:
+                logger.warning(
+                    "No article_ticker link for article %s / %s; dropping impact",
+                    article.id,
+                    impact.symbol,
+                )
                 continue
             link.impact = impact.impact
             link.impact_confidence = impact.confidence

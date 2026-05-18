@@ -2,6 +2,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from enum import StrEnum
+from typing import Literal, overload
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -102,10 +103,7 @@ def _poll_evaluations(
                     ticker_symbols=[t.symbol for t in a.tickers],
                 )
                 for a in articles
-                if a.tickers
             ]
-            if not inputs:
-                return
 
             logger.info("Evaluating %d article(s) in batches of %d", len(inputs), batch_size)
             all_results: list[ArticleEvaluation] = []
@@ -122,6 +120,18 @@ def _poll_evaluations(
         logger.exception("Unexpected error during evaluation poll")
 
 
+@overload
+def _read_int_env(name: str, *, required: Literal[True], default: int | None = None) -> int: ...
+
+
+@overload
+def _read_int_env(name: str, *, required: Literal[False], default: int) -> int: ...
+
+
+@overload
+def _read_int_env(name: str, *, required: Literal[False], default: None = None) -> int | None: ...
+
+
 def _read_int_env(name: str, *, required: bool, default: int | None = None) -> int | None:
     raw = os.getenv(name)
     if not raw:
@@ -134,14 +144,21 @@ def _read_int_env(name: str, *, required: bool, default: int | None = None) -> i
         raise ValueError(f"{name} must be a valid integer, got: {raw!r}") from None
 
 
+def _env_bool(name: str, *, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _register_evaluation_job(scheduler: BackgroundScheduler) -> None:
-    if os.getenv("EVALUATOR_ENABLED", "false").lower() != "true":
+    if not _env_bool("EVALUATOR_ENABLED", default=False):
         logger.info("Evaluator disabled; skipping evaluation job registration")
         return
 
     eval_interval = _read_int_env("EVALUATION_POLL_INTERVAL_MINUTES", required=True)
-    batch_size = _read_int_env("EVALUATOR_BATCH_SIZE", required=False, default=10) or 10
-    max_per_run = _read_int_env("EVALUATOR_MAX_PER_RUN", required=False, default=100) or 100
+    batch_size = _read_int_env("EVALUATOR_BATCH_SIZE", required=False, default=10)
+    max_per_run = _read_int_env("EVALUATOR_MAX_PER_RUN", required=False, default=100)
     version = os.getenv("EVALUATOR_VERSION", "v1")
 
     try:

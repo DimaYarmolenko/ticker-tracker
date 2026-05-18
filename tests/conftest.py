@@ -4,13 +4,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
-from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 import app.repository as repo
+from alembic import command
 from app.database import Base, get_db
 from app.main import app
 from app.models import Ticker

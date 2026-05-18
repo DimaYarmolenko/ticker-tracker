@@ -8,6 +8,13 @@ Adds importance / evaluated_at / evaluator_version on ``articles`` and
 impact / impact_confidence on ``article_tickers``. Uses ``IF NOT EXISTS`` so
 the migration is idempotent against databases where ``Base.metadata.create_all``
 already added the columns.
+
+Note: this revision intentionally uses raw ``op.execute`` with Postgres-specific
+``IF NOT EXISTS`` / ``IF EXISTS`` clauses rather than ``op.add_column`` /
+``op.drop_column``. The SQLAlchemy op API does not expose ``IF NOT EXISTS``, and
+that clause is what makes the migration safe to run against pre-Alembic
+databases where the columns may already be present. Future migrations that do
+not need this bootstrap-idempotency should prefer the standard ``op.*`` helpers.
 """
 
 from typing import Sequence, Union

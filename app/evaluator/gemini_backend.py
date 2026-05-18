@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Any
 
 from google import genai
 
@@ -18,7 +17,7 @@ _DEFAULT_MODEL = "gemini-2.5-flash"
 
 
 class GeminiEvaluator:
-    def __init__(self, client: Any | None = None, model: str | None = None) -> None:
+    def __init__(self, client: genai.Client | None = None, model: str | None = None) -> None:
         if client is None:
             api_key = os.getenv("GEMINI_API_KEY")
             if not api_key:

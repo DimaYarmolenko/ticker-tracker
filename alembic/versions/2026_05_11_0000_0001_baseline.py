@@ -12,10 +12,10 @@ detects their presence and is a no-op.
 
 from typing import Sequence, Union
 
-from alembic import op
 from sqlalchemy import inspect
 
 import app.models  # noqa: F401  -- register models with Base.metadata
+from alembic import op
 from app.database import Base
 
 revision: str = "0001_baseline"
