@@ -1,0 +1,43 @@
+<aside id="sidebar" class="sidebar">
+  <form class="add-form"
+        hx-post="/ui/tickers"
+        hx-target="#sidebar"
+        hx-swap="outerHTML">
+    <input name="symbol"
+           type="text"
+           placeholder="Add symbol"
+           value="{{ form_value or '' }}"
+           autocomplete="off"
+           autocapitalize="characters"
+           spellcheck="false"
+           required
+           maxlength="20"
+           {% if error %}autofocus{% endif %}>
+    <button type="submit" aria-label="Add ticker">+</button>
+  </form>
+
+  {% if error %}
+    <div class="error" role="alert">{{ error }}</div>
+  {% endif %}
+
+  <ul class="ticker-list">
+    {% for t in tickers %}
+      <li class="ticker-row{% if selected == t.symbol %} is-selected{% endif %}">
+        <button class="ticker-symbol"
+                type="button"
+                hx-get="/ui/tickers/{{ t.symbol }}/articles"
+                hx-target="#articles"
+                hx-swap="outerHTML">{{ t.symbol }}</button>
+        <button class="ticker-delete"
+                type="button"
+                aria-label="Remove {{ t.symbol }}"
+                hx-delete="/ui/tickers/{{ t.symbol }}"
+                hx-target="#sidebar"
+                hx-swap="outerHTML"
+                hx-confirm="Remove {{ t.symbol }}?">&times;</button>
+      </li>
+    {% else %}
+      <li class="empty">No tickers tracked yet.</li>
+    {% endfor %}
+  </ul>
+</aside>

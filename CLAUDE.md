@@ -32,6 +32,12 @@ There are example files @.env.example and @.test.env.example where you can see w
 - Results land in `articles.importance` (1-5), `articles.evaluated_at`, `articles.evaluator_version`, and per-link `article_tickers.impact` (`positive` / `negative` / `neutral`) + `article_tickers.impact_confidence`. The `ImpactLabel` StrEnum in @app/models.py is the source of truth for impact values.
 - Tunables: `EVALUATION_POLL_INTERVAL_MINUTES`, `EVALUATOR_BATCH_SIZE`, `EVALUATOR_MAX_PER_RUN`, `EVALUATOR_VERSION`, `GEMINI_MODEL`.
 
+# Web UI
+- A minimal web UI is served at `/` by the same FastAPI app — Jinja2 templates progressively enhanced with HTMX (no build step, no SPA framework). Routes live in @app/ui.py; the JSON API in @app/main.py is untouched.
+- Templates live in `app/templates/` (`base.html`, `index.html`, `_tickers.html`, `_articles.html`). Static assets (`style.css`, vendored `htmx.min.js`) live in `app/static/` and are mounted at `/static`.
+- HTML routes: `GET /` (full page), `GET/POST/DELETE /ui/tickers` (sidebar partial), `GET /ui/tickers/{symbol}/articles?limit&offset` (articles partial). The article partial renders as a full `<section id="articles">` when `offset == 0` and as bare rows + a new "Load more" link when `offset > 0`, so HTMX `outerHTML` swaps append cleanly.
+- UI mutations return rendered partials (never raise `HTTPException`); user-facing errors (duplicate add, unknown delete) render as an inline `.error` banner in the sidebar partial.
+
 # Commands
 Most common commands, try to use them instead of creating your own
 - make up: start the app
