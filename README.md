@@ -1,6 +1,6 @@
 # Ticker Tracker
 
-A REST API for tracking stock ticker symbols and collecting related signal — news headlines, periodic price snapshots, and (optionally) LLM-scored news importance / per-ticker impact. Built with FastAPI and PostgreSQL.
+A FastAPI + PostgreSQL service for tracking stock ticker symbols and collecting related signal — news headlines, periodic price snapshots, and (optionally) LLM-scored news importance / per-ticker impact. Ships with a minimal web UI (Jinja2 + HTMX) for managing tickers and browsing collected articles, plus a JSON REST API.
 
 ## Running the app
 
@@ -8,8 +8,11 @@ A REST API for tracking stock ticker symbols and collecting related signal — n
 docker compose up --build
 ```
 
-The API will be available at `http://localhost:8000`.  
-Interactive docs (Swagger UI) at `http://localhost:8000/docs`.
+The app will be available at `http://localhost:8000`:
+
+- **Web UI** — `http://localhost:8000/` — manage tickers (add/remove) and browse collected news per ticker.
+- **JSON API** — see endpoint table below.
+- **Interactive API docs** (Swagger UI) — `http://localhost:8000/docs`.
 
 The app container runs `alembic upgrade head` before starting uvicorn, so a fresh database is bootstrapped automatically. The PostgreSQL database persists in a named Docker volume (`postgres-data`) across container restarts. Only `docker compose down -v` will remove it.
 
@@ -39,7 +42,19 @@ pip install -r requirements-dev.txt
 uvicorn app.main:app --reload
 ```
 
-## Endpoints
+## Web UI
+
+A minimal HTML interface is served at `/` — Jinja2 templates progressively enhanced with [HTMX](https://htmx.org/) for in-place updates (add/delete ticker, load more articles), no build step, no SPA framework. Templates live in `app/templates/`, the stylesheet and vendored htmx bundle in `app/static/`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/` | Main page — sidebar of tracked tickers + article pane |
+| `GET` | `/ui/tickers` | Rendered ticker sidebar (HTML partial) |
+| `POST` | `/ui/tickers` | Add a ticker (form field `symbol`); returns updated sidebar |
+| `DELETE` | `/ui/tickers/{symbol}` | Remove a ticker; returns updated sidebar |
+| `GET` | `/ui/tickers/{symbol}/articles` | Articles for a ticker (supports `?limit=20&offset=0`); returns full pane when `offset=0`, appended rows otherwise |
+
+## JSON API
 
 | Method | Path | Description |
 |--------|------|-------------|

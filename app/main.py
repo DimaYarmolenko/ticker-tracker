@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated, AsyncGenerator
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 import app.repository as repo
@@ -17,6 +18,7 @@ from app.schemas import (
     TickerCreate,
     TickerResponse,
 )
+from app.ui import router as ui_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,6 +34,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(title="Ticker Tracker", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.include_router(ui_router)
 
 
 @app.get("/tickers", response_model=list[TickerResponse])

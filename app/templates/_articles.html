@@ -1,0 +1,51 @@
+{% macro article_item(a) %}
+  <article class="article">
+    <a class="article-title" href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.title }}</a>
+    <div class="article-meta">
+      {% if a.source %}<span>{{ a.source }}</span>{% endif %}
+      {% if a.published_at %}<span>{{ a.published_at.strftime('%Y-%m-%d %H:%M') }}</span>{% endif %}
+    </div>
+    {% if a.importance is not none or a.impact %}
+      <div class="badges">
+        {% if a.importance is not none %}
+          <span class="badge badge-importance" title="Importance">&#9733; {{ a.importance }}/5</span>
+        {% endif %}
+        {% if a.impact %}
+          {% set impact_value = a.impact.value if a.impact.value is defined else a.impact %}
+          <span class="badge badge-impact badge-impact-{{ impact_value }}"
+                {% if a.impact_confidence is not none %}title="Confidence: {{ '%.0f'|format(a.impact_confidence * 100) }}%"{% endif %}>
+            {{ impact_value }}
+          </span>
+        {% endif %}
+      </div>
+    {% endif %}
+  </article>
+{% endmacro %}
+
+{% macro load_more(ticker, next_offset) %}
+  <a class="load-more"
+     hx-get="/ui/tickers/{{ ticker }}/articles?offset={{ next_offset }}"
+     hx-target="this"
+     hx-swap="outerHTML">Load more</a>
+{% endmacro %}
+
+{% if is_initial %}
+<section id="articles" class="articles">
+  <header class="articles-header">
+    <h2><code>{{ ticker }}</code></h2>
+    <span class="muted">{{ total }} article{{ '' if total == 1 else 's' }}</span>
+  </header>
+
+  {% if articles %}
+    <div class="article-list">
+      {% for a in articles %}{{ article_item(a) }}{% endfor %}
+      {% if has_more %}{{ load_more(ticker, next_offset) }}{% endif %}
+    </div>
+  {% else %}
+    <p class="empty">No articles yet for {{ ticker }}.</p>
+  {% endif %}
+</section>
+{% else %}
+  {% for a in articles %}{{ article_item(a) }}{% endfor %}
+  {% if has_more %}{{ load_more(ticker, next_offset) }}{% endif %}
+{% endif %}
