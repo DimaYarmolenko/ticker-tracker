@@ -30,6 +30,45 @@ def test_add_ticker_duplicate_shows_inline_error(client):
     assert len([t for t in listing if t["symbol"] == "AAPL"]) == 1
 
 
+def test_add_ticker_preserves_input_value_on_duplicate(client):
+    """Bug #1: input value must survive a failed (duplicate) add so the user can edit."""
+    client.post("/ui/tickers", data={"symbol": "AAPL"})
+    response = client.post("/ui/tickers", data={"symbol": "AAPL"})
+    assert response.status_code == 200
+    assert 'value="AAPL"' in response.text
+
+
+def test_add_ticker_clears_input_value_on_success(client):
+    """Successful add must leave the input empty so the user can type the next symbol."""
+    response = client.post("/ui/tickers", data={"symbol": "AAPL"})
+    assert response.status_code == 200
+    assert 'value="AAPL"' not in response.text
+
+
+def test_add_ticker_no_selection_on_duplicate(client):
+    """Bug #2: a failed (duplicate) add must not highlight any sidebar row as selected."""
+    client.post("/ui/tickers", data={"symbol": "AAPL"})
+    response = client.post("/ui/tickers", data={"symbol": "AAPL"})
+    assert response.status_code == 200
+    assert "is-selected" not in response.text
+
+
+def test_add_ticker_sets_selection_on_success(client):
+    """Successful add highlights the new ticker as selected."""
+    response = client.post("/ui/tickers", data={"symbol": "AAPL"})
+    assert response.status_code == 200
+    assert "is-selected" in response.text
+
+
+def test_add_ticker_empty_symbol_shows_error(client):
+    """Whitespace-only symbols strip to empty and must surface a 'required' error."""
+    response = client.post("/ui/tickers", data={"symbol": "   "})
+    assert response.status_code == 200
+    assert "Symbol is required" in response.text
+    listing = client.get("/tickers").json()
+    assert listing == []
+
+
 def test_delete_ticker_via_ui_removes_row(client, seeded_tickers):
     response = client.delete("/ui/tickers/AAPL")
     assert response.status_code == 200
@@ -55,6 +94,15 @@ def test_get_articles_unknown_ticker_returns_404(client):
     response = client.get("/ui/tickers/UNKNOWN/articles")
     assert response.status_code == 404
     assert "UNKNOWN not found" in response.text
+
+
+def test_get_articles_404_escapes_symbol(client):
+    """Bug #4: the 404 branch must not interpolate raw HTML from the URL path."""
+    response = client.get("/ui/tickers/<svg>/articles")
+    assert response.status_code == 404
+    assert "<SVG>" not in response.text
+    assert "<svg>" not in response.text
+    assert "&lt;SVG&gt;" in response.text
 
 
 def test_get_articles_empty_for_known_ticker(client, seeded_tickers):

@@ -2,16 +2,17 @@
   <form class="add-form"
         hx-post="/ui/tickers"
         hx-target="#sidebar"
-        hx-swap="outerHTML"
-        hx-on::after-request="if(event.detail.successful) this.reset()">
+        hx-swap="outerHTML">
     <input name="symbol"
            type="text"
            placeholder="Add symbol"
+           value="{{ form_value or '' }}"
            autocomplete="off"
            autocapitalize="characters"
            spellcheck="false"
            required
-           maxlength="20">
+           maxlength="20"
+           {% if error %}autofocus{% endif %}>
     <button type="submit" aria-label="Add ticker">+</button>
   </form>
 

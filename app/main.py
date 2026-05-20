@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated, AsyncGenerator
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
@@ -33,8 +34,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     stop_scheduler()
 
 
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+
 app = FastAPI(title="Ticker Tracker", lifespan=lifespan)
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 app.include_router(ui_router)
 
 

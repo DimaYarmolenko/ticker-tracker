@@ -11,10 +11,9 @@
           <span class="badge badge-importance" title="Importance">&#9733; {{ a.importance }}/5</span>
         {% endif %}
         {% if a.impact %}
-          {% set impact_value = a.impact.value if a.impact.value is defined else a.impact %}
-          <span class="badge badge-impact badge-impact-{{ impact_value }}"
+          <span class="badge badge-impact badge-impact-{{ a.impact }}"
                 {% if a.impact_confidence is not none %}title="Confidence: {{ '%.0f'|format(a.impact_confidence * 100) }}%"{% endif %}>
-            {{ impact_value }}
+            {{ a.impact }}
           </span>
         {% endif %}
       </div>

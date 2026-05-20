@@ -4,7 +4,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Form, Query, Request, status
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 import app.repository as repo
@@ -18,13 +17,23 @@ templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
 
 def _render_tickers(
-    request: Request, db: Session, *, error: str | None = None, selected: str | None = None
+    request: Request,
+    db: Session,
+    *,
+    error: str | None = None,
+    selected: str | None = None,
+    form_value: str | None = None,
 ) -> HTMLResponse:
     tickers = repo.get_all(db)
     return templates.TemplateResponse(
         request,
         "_tickers.html",
-        {"tickers": tickers, "selected": selected, "error": error},
+        {
+            "tickers": tickers,
+            "selected": selected,
+            "error": error,
+            "form_value": form_value,
+        },
     )
 
 
@@ -34,7 +43,7 @@ def index(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
         "index.html",
-        {"tickers": tickers, "selected": None, "error": None},
+        {"tickers": tickers, "selected": None, "error": None, "form_value": None},
     )
 
 
@@ -49,20 +58,20 @@ def ui_add_ticker(
     symbol: Annotated[str, Form()],
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
-    error: str | None = None
-    try:
-        payload = TickerCreate(symbol=symbol)
-    except ValidationError:
-        return _render_tickers(request, db, error="Invalid symbol")
+    payload = TickerCreate(symbol=symbol)
 
     if not payload.symbol:
-        error = "Symbol is required"
-    elif repo.get_by_symbol(db, payload.symbol):
-        error = f"{payload.symbol} is already tracked"
-    else:
-        repo.create(db, payload.symbol)
+        return _render_tickers(request, db, error="Symbol is required")
+    if repo.get_by_symbol(db, payload.symbol):
+        return _render_tickers(
+            request,
+            db,
+            error=f"{payload.symbol} is already tracked",
+            form_value=payload.symbol,
+        )
 
-    return _render_tickers(request, db, error=error, selected=payload.symbol)
+    repo.create(db, payload.symbol)
+    return _render_tickers(request, db, selected=payload.symbol)
 
 
 @router.delete("/ui/tickers/{symbol}", response_class=HTMLResponse)
@@ -86,9 +95,10 @@ def ui_ticker_articles(
     upper = symbol.upper()
     ticker = repo.get_by_symbol(db, upper)
     if not ticker:
-        return HTMLResponse(
-            f'<section id="articles" class="articles"><p class="empty">'
-            f"{upper} not found</p></section>",
+        return templates.TemplateResponse(
+            request,
+            "_articles_not_found.html",
+            {"ticker": upper},
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
