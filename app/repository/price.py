@@ -37,6 +37,18 @@ def get_prices_page(
     return [], total or 0
 
 
+def get_price_history(db: Session, ticker_id: str, limit: int = 2000) -> list[Price]:
+    stmt = (
+        sa_select(Price)
+        .where(Price.ticker_id == ticker_id)
+        .order_by(Price.fetched_at.desc())
+        .limit(limit)
+    )
+    rows = list(db.execute(stmt).scalars())
+    rows.reverse()
+    return rows
+
+
 def insert_prices(db: Session, prices_data: list[PriceData]) -> None:
     if not prices_data:
         return

@@ -133,6 +133,44 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
 .ticker-delete:hover { color: var(--danger); }
 
 /* Main pane */
+.main-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chart {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+}
+.chart-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.chart-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.chart-header code {
+  font-family: var(--mono);
+  font-size: 16px;
+  background: var(--bg);
+  padding: 2px 8px;
+  border-radius: var(--radius);
+}
+.chart-canvas-wrapper {
+  position: relative;
+  height: 220px;
+  width: 100%;
+}
+
 .articles {
   background: var(--surface);
   border: 1px solid var(--border);

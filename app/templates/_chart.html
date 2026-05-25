@@ -1,0 +1,54 @@
+<section id="chart" class="chart"
+         hx-get="/ui/tickers/{{ ticker }}/chart"
+         hx-trigger="every {{ refresh_seconds }}s[!document.hidden]"
+         hx-swap="outerHTML"
+         hx-on::before-swap="if (window.Chart) { var c = this.querySelector('canvas'); if (c) Chart.getChart(c)?.destroy(); }">
+  <header class="chart-header">
+    <h2><code>{{ ticker }}</code></h2>
+    <span class="muted">{{ points|length }} snapshot{{ '' if points|length == 1 else 's' }}</span>
+  </header>
+  {% if points %}
+    <div class="chart-canvas-wrapper">
+      <canvas id="chart-canvas-{{ ticker }}"></canvas>
+    </div>
+    <script type="application/json" id="chart-data-{{ ticker }}">{{ points|tojson }}</script>
+    <script>
+      (function () {
+        var node = document.getElementById("chart-data-{{ ticker }}");
+        var canvas = document.getElementById("chart-canvas-{{ ticker }}");
+        if (!node || !canvas || !window.Chart) return;
+        var data = JSON.parse(node.textContent);
+        var existing = Chart.getChart(canvas);
+        if (existing) existing.destroy();
+        new Chart(canvas, {
+          type: "line",
+          data: {
+            labels: data.map(function (d) { return d.t; }),
+            datasets: [{
+              label: "{{ ticker }}",
+              data: data.map(function (d) { return d.p; }),
+              borderColor: "#2d6cdf",
+              backgroundColor: "rgba(45,108,223,0.1)",
+              tension: 0.2,
+              pointRadius: 0,
+              borderWidth: 2,
+              fill: true,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { ticks: { maxTicksLimit: 6, maxRotation: 0 } },
+              y: { ticks: { maxTicksLimit: 6 } },
+            },
+          },
+        });
+      })();
+    </script>
+  {% else %}
+    <p class="empty">No price data yet for {{ ticker }}.</p>
+  {% endif %}
+</section>
