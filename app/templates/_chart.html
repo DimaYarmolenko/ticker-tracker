@@ -1,7 +1,8 @@
 <section id="chart" class="chart"
          hx-get="/ui/tickers/{{ ticker }}/chart"
-         hx-trigger="every 30s"
-         hx-swap="outerHTML">
+         hx-trigger="every {{ refresh_seconds }}s[!document.hidden]"
+         hx-swap="outerHTML"
+         hx-on::before-swap="if (window.Chart) { var c = this.querySelector('canvas'); if (c) Chart.getChart(c)?.destroy(); }">
   <header class="chart-header">
     <h2><code>{{ ticker }}</code></h2>
     <span class="muted">{{ points|length }} snapshot{{ '' if points|length == 1 else 's' }}</span>

@@ -10,5 +10,16 @@
 </head>
 <body>
   {% block content %}{% endblock %}
+  <script>
+    document.body.addEventListener("htmx:afterSwap", function (event) {
+      if (event.target.id !== "sidebar") return;
+      var active = document.getElementById("main-pane")?.dataset.activeTicker;
+      if (!active) return;
+      document.querySelectorAll(".ticker-row").forEach(function (row) {
+        var btn = row.querySelector(".ticker-symbol");
+        row.classList.toggle("is-selected", !!btn && btn.textContent.trim() === active);
+      });
+    });
+  </script>
 </body>
 </html>

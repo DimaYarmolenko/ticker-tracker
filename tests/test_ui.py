@@ -73,6 +73,21 @@ def test_add_ticker_empty_symbol_shows_error(client):
     assert listing == []
 
 
+def test_add_ticker_invalid_charset_shows_error(client):
+    """Symbols with disallowed characters surface an inline charset error and are not stored."""
+    response = client.post("/ui/tickers", data={"symbol": "A!B"})
+    assert response.status_code == 200
+    assert "Symbol must be 1-20 chars" in response.text
+    listing = client.get("/tickers").json()
+    assert listing == []
+
+
+def test_json_add_ticker_invalid_charset_returns_422(client):
+    """JSON API rejects disallowed characters with a 422 from pydantic validation."""
+    response = client.post("/tickers", json={"symbol": "A!B"})
+    assert response.status_code == 422
+
+
 def test_delete_ticker_via_ui_removes_row(client, seeded_tickers):
     response = client.delete("/ui/tickers/AAPL")
     assert response.status_code == 200
@@ -144,7 +159,9 @@ def test_get_chart_renders_section_with_auto_refresh(client, seeded_tickers, see
     assert response.status_code == 200
     assert 'id="chart"' in response.text
     assert 'id="chart-canvas-AAPL"' in response.text
-    assert 'hx-trigger="every 30s"' in response.text
+    assert re.search(r'hx-trigger="every \d+s\[!document\.hidden\]"', response.text), (
+        "chart section must auto-refresh on an interval, paused when tab is hidden"
+    )
     assert 'hx-get="/ui/tickers/AAPL/chart"' in response.text
 
 

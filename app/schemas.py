@@ -1,8 +1,11 @@
+import re
 from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
 from app.models import ImpactLabel
+
+_SYMBOL_PATTERN = re.compile(r"^[A-Z0-9.\-]{1,20}$")
 
 
 class ArticleResponse(BaseModel):
@@ -63,7 +66,12 @@ class TickerCreate(BaseModel):
     @field_validator("symbol")
     @classmethod
     def uppercase_symbol(cls, v: str) -> str:
-        return v.strip().upper()
+        normalized = v.strip().upper()
+        if not normalized:
+            raise ValueError("Symbol is required")
+        if not _SYMBOL_PATTERN.match(normalized):
+            raise ValueError("Symbol must be 1-20 chars: A-Z, 0-9, '.', '-'")
+        return normalized
 
 
 class TickerResponse(BaseModel):
