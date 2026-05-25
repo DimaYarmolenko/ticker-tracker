@@ -10,6 +10,7 @@ from app.repository.evaluation import (
 )
 from app.repository.price import (
     PriceData,
+    get_price_history,
     get_prices_page,
     insert_prices,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "get_article_by_url",
     "get_articles_page",
     "get_by_symbol",
+    "get_price_history",
     "get_prices_page",
     "get_unevaluated_articles",
     "insert_prices",

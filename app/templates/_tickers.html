@@ -25,9 +25,10 @@
       <li class="ticker-row{% if selected == t.symbol %} is-selected{% endif %}">
         <button class="ticker-symbol"
                 type="button"
-                hx-get="/ui/tickers/{{ t.symbol }}/articles"
-                hx-target="#articles"
-                hx-swap="outerHTML">{{ t.symbol }}</button>
+                hx-get="/ui/tickers/{{ t.symbol }}/view"
+                hx-target="#main-pane"
+                hx-swap="innerHTML"
+                hx-on:click="document.querySelectorAll('.ticker-row.is-selected').forEach(function(r){r.classList.remove('is-selected');}); this.closest('.ticker-row').classList.add('is-selected');">{{ t.symbol }}</button>
         <button class="ticker-delete"
                 type="button"
                 aria-label="Remove {{ t.symbol }}"

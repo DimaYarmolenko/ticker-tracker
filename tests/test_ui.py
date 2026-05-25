@@ -1,3 +1,7 @@
+import json
+import re
+
+
 def test_index_renders(client):
     response = client.get("/")
     assert response.status_code == 200
@@ -50,14 +54,14 @@ def test_add_ticker_no_selection_on_duplicate(client):
     client.post("/ui/tickers", data={"symbol": "AAPL"})
     response = client.post("/ui/tickers", data={"symbol": "AAPL"})
     assert response.status_code == 200
-    assert "is-selected" not in response.text
+    assert "ticker-row is-selected" not in response.text
 
 
 def test_add_ticker_sets_selection_on_success(client):
     """Successful add highlights the new ticker as selected."""
     response = client.post("/ui/tickers", data={"symbol": "AAPL"})
     assert response.status_code == 200
-    assert "is-selected" in response.text
+    assert "ticker-row is-selected" in response.text
 
 
 def test_add_ticker_empty_symbol_shows_error(client):
@@ -123,3 +127,65 @@ def test_get_articles_partial_swap_omits_header(client, seeded_articles):
     assert response.status_code == 200
     assert '<section id="articles"' not in response.text
     assert "Tech giants rally" in response.text or "AAPL hits new high" in response.text
+
+
+def _extract_chart_points(body: str, symbol: str) -> list[dict]:
+    match = re.search(
+        rf'<script type="application/json" id="chart-data-{symbol}">(.*?)</script>',
+        body,
+        re.DOTALL,
+    )
+    assert match, f"chart-data-{symbol} script not found"
+    return json.loads(match.group(1))
+
+
+def test_get_chart_renders_section_with_auto_refresh(client, seeded_tickers, seeded_prices):
+    response = client.get("/ui/tickers/AAPL/chart")
+    assert response.status_code == 200
+    assert 'id="chart"' in response.text
+    assert 'id="chart-canvas-AAPL"' in response.text
+    assert 'hx-trigger="every 30s"' in response.text
+    assert 'hx-get="/ui/tickers/AAPL/chart"' in response.text
+
+
+def test_get_chart_embeds_points_in_ascending_order(client, seeded_tickers, seeded_prices):
+    response = client.get("/ui/tickers/AAPL/chart")
+    points = _extract_chart_points(response.text, "AAPL")
+    assert [p["p"] for p in points] == [175.50, 176.20]
+    timestamps = [p["t"] for p in points]
+    assert timestamps == sorted(timestamps)
+
+
+def test_get_chart_empty_state_when_no_prices(client, seeded_tickers):
+    response = client.get("/ui/tickers/AAPL/chart")
+    assert response.status_code == 200
+    assert "No price data yet" in response.text
+    assert 'id="chart-canvas-AAPL"' not in response.text
+
+
+def test_get_chart_unknown_ticker_returns_404(client):
+    response = client.get("/ui/tickers/UNKNOWN/chart")
+    assert response.status_code == 404
+    assert "UNKNOWN not found" in response.text
+
+
+def test_get_view_contains_chart_and_articles(client, seeded_articles, seeded_prices):
+    response = client.get("/ui/tickers/AAPL/view")
+    assert response.status_code == 200
+    assert 'id="chart"' in response.text
+    assert 'id="articles"' in response.text
+    assert "AAPL hits new high" in response.text
+    assert 'id="chart-canvas-AAPL"' in response.text
+
+
+def test_get_view_unknown_ticker_returns_404(client):
+    response = client.get("/ui/tickers/UNKNOWN/view")
+    assert response.status_code == 404
+    assert "UNKNOWN not found" in response.text
+
+
+def test_sidebar_button_targets_view_route(client, seeded_tickers):
+    response = client.get("/ui/tickers")
+    assert response.status_code == 200
+    assert 'hx-get="/ui/tickers/AAPL/view"' in response.text
+    assert 'hx-target="#main-pane"' in response.text

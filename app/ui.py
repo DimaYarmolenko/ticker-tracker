@@ -129,3 +129,83 @@ def ui_ticker_articles(
             "is_initial": offset == 0,
         },
     )
+
+
+_CHART_HISTORY_LIMIT = 2000
+_ARTICLES_INITIAL_LIMIT = 20
+
+
+def _build_chart_context(ticker_symbol: str, prices: list) -> dict:
+    points = [{"t": p.fetched_at.strftime("%Y-%m-%d %H:%M"), "p": p.price} for p in prices]
+    return {"ticker": ticker_symbol, "points": points}
+
+
+def _build_articles_context(ticker_symbol: str, rows, total: int, limit: int, offset: int) -> dict:
+    articles = [
+        {
+            "title": article.title,
+            "url": article.url,
+            "source": article.source,
+            "published_at": article.published_at,
+            "importance": article.importance,
+            "impact": link.impact,
+            "impact_confidence": link.impact_confidence,
+        }
+        for article, link in rows
+    ]
+    return {
+        "ticker": ticker_symbol,
+        "articles": articles,
+        "offset": offset,
+        "limit": limit,
+        "total": total,
+        "has_more": offset + len(articles) < total,
+        "next_offset": offset + limit,
+        "is_initial": offset == 0,
+    }
+
+
+@router.get("/ui/tickers/{symbol}/chart", response_class=HTMLResponse)
+def ui_ticker_chart(
+    request: Request,
+    symbol: str,
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    upper = symbol.upper()
+    ticker = repo.get_by_symbol(db, upper)
+    if not ticker:
+        return templates.TemplateResponse(
+            request,
+            "_chart_not_found.html",
+            {"ticker": upper},
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    prices = repo.get_price_history(db, ticker.id, limit=_CHART_HISTORY_LIMIT)
+    return templates.TemplateResponse(
+        request,
+        "_chart.html",
+        _build_chart_context(upper, prices),
+    )
+
+
+@router.get("/ui/tickers/{symbol}/view", response_class=HTMLResponse)
+def ui_ticker_view(
+    request: Request,
+    symbol: str,
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    upper = symbol.upper()
+    ticker = repo.get_by_symbol(db, upper)
+    if not ticker:
+        return templates.TemplateResponse(
+            request,
+            "_chart_not_found.html",
+            {"ticker": upper},
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    prices = repo.get_price_history(db, ticker.id, limit=_CHART_HISTORY_LIMIT)
+    rows, total = repo.get_articles_page(db, ticker.id, limit=_ARTICLES_INITIAL_LIMIT, offset=0)
+    context = _build_chart_context(upper, prices) | _build_articles_context(
+        upper, rows, total, limit=_ARTICLES_INITIAL_LIMIT, offset=0
+    )
+    return templates.TemplateResponse(request, "_ticker_view.html", context)
