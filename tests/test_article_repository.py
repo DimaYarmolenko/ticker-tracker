@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 import app.repository as repo
 from app.evaluator import ArticleEvaluation, TickerImpact
-from app.models import Article, ImpactLabel
+from app.models import Article, ImpactLabel, Ticker
 
 
 def _evaluate_all(db_session: Session, impact: ImpactLabel = ImpactLabel.POSITIVE) -> None:
@@ -117,7 +117,7 @@ def test_get_evaluated_articles_for_chart_respects_limit(
 
 
 def test_get_evaluated_articles_for_chart_skips_null_published_at(
-    db_session: Session, seeded_tickers: list
+    db_session: Session, seeded_tickers: list[Ticker]
 ) -> None:
     """Articles without a published_at cannot be plotted and must be excluded."""
     repo.upsert_articles(

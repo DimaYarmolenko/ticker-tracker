@@ -249,6 +249,81 @@ def test_get_chart_markers_include_evaluated_articles(client, db_session, seeded
     assert m["p"] == 176.0
 
 
+def _evaluate_aapl_seeded_article(db_session, importance: int = 3, confidence: float = 0.8) -> str:
+    """Evaluate the AAPL-only seeded article and return its id."""
+    article = next(
+        a for a in repo.get_unevaluated_articles(db_session, limit=10) if "AAPL" in a.title
+    )
+    repo.save_evaluations(
+        db_session,
+        [
+            ArticleEvaluation(
+                article_id=article.id,
+                importance=importance,
+                impacts=[
+                    TickerImpact(symbol="AAPL", impact=ImpactLabel.POSITIVE, confidence=confidence),
+                ],
+            )
+        ],
+        version="v1",
+    )
+    return article.id
+
+
+def test_get_chart_marker_after_latest_price_clamps_to_last_price(
+    client, db_session, seeded_articles
+):
+    """Articles published after the latest price snapshot are plotted at the last known price."""
+    aapl = repo.get_by_symbol(db_session, "AAPL")
+    assert aapl is not None
+    # Seeded article is published 2026-04-28 10:00 UTC; both prices are *before* it.
+    db_session.add_all(
+        [
+            Price(
+                ticker_id=aapl.id,
+                price=170.0,
+                fetched_at=datetime(2026, 4, 28, 8, 0, tzinfo=timezone.utc),
+            ),
+            Price(
+                ticker_id=aapl.id,
+                price=172.5,
+                fetched_at=datetime(2026, 4, 28, 9, 0, tzinfo=timezone.utc),
+            ),
+        ]
+    )
+    db_session.commit()
+    _evaluate_aapl_seeded_article(db_session)
+
+    markers = _extract_chart_markers(client.get("/ui/tickers/AAPL/chart").text, "AAPL")
+    assert len(markers) == 1
+    assert markers[0]["p"] == 172.5
+
+
+def test_get_chart_marker_before_earliest_price_is_excluded(client, db_session, seeded_articles):
+    """Articles before the earliest price snapshot have no basis to interpolate and are dropped."""
+    aapl = repo.get_by_symbol(db_session, "AAPL")
+    assert aapl is not None
+    # Seeded article is published 2026-04-28 10:00 UTC; both prices are *after* it.
+    db_session.add_all(
+        [
+            Price(
+                ticker_id=aapl.id,
+                price=180.0,
+                fetched_at=datetime(2026, 4, 29, 9, 0, tzinfo=timezone.utc),
+            ),
+            Price(
+                ticker_id=aapl.id,
+                price=181.0,
+                fetched_at=datetime(2026, 4, 29, 10, 0, tzinfo=timezone.utc),
+            ),
+        ]
+    )
+    db_session.commit()
+    _evaluate_aapl_seeded_article(db_session)
+
+    assert _extract_chart_markers(client.get("/ui/tickers/AAPL/chart").text, "AAPL") == []
+
+
 def test_get_chart_points_are_epoch_ms(client, seeded_tickers, seeded_prices):
     """Points must use numeric epoch-ms so the chart's linear x-axis can plot markers alongside."""
     response = client.get("/ui/tickers/AAPL/chart")

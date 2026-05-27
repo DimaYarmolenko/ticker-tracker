@@ -2,7 +2,7 @@ import bisect
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, TypedDict
 
 from fastapi import APIRouter, Depends, Form, Query, Request, status
 from fastapi.responses import HTMLResponse
@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 import app.repository as repo
 from app.database import get_db
-from app.models import Article, ArticleTicker, Price
+from app.models import Article, ArticleTicker, ImpactLabel, Price
 from app.schemas import TickerCreate
 
 router = APIRouter()
@@ -24,6 +24,22 @@ templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 _CHART_HISTORY_LIMIT = 2000
 _ARTICLES_INITIAL_LIMIT = 20
 _MIN_REFRESH_SECONDS = 60
+
+
+class ChartPoint(TypedDict):
+    t: int
+    p: float
+
+
+class ChartMarker(TypedDict):
+    t: int
+    p: float
+    impact: ImpactLabel
+    importance: int
+    confidence: float
+    title: str
+    source: str
+    url: str
 
 
 def _chart_refresh_seconds() -> int:
@@ -42,17 +58,15 @@ def _to_epoch_ms(dt: datetime) -> int:
 
 def _build_chart_markers(
     prices: list[Price], rows: list[tuple[Article, ArticleTicker]]
-) -> list[dict]:
+) -> list[ChartMarker]:
     if not prices or not rows:
         return []
     price_ms = [_to_epoch_ms(p.fetched_at) for p in prices]
-    earliest_ms, latest_ms = price_ms[0], price_ms[-1]
-    markers: list[dict] = []
+    earliest_ms = price_ms[0]
+    markers: list[ChartMarker] = []
     for article, link in rows:
-        if article.published_at is None:
-            continue
         target_ms = _to_epoch_ms(article.published_at)
-        if target_ms < earliest_ms or target_ms > latest_ms:
+        if target_ms < earliest_ms:
             continue
         idx = bisect.bisect_left(price_ms, target_ms)
         if idx == 0:
@@ -64,16 +78,16 @@ def _build_chart_markers(
             a_p, b_p = prices[idx - 1].price, prices[idx].price
             interp = a_p if b_ms == a_ms else a_p + (target_ms - a_ms) / (b_ms - a_ms) * (b_p - a_p)
         markers.append(
-            {
-                "t": target_ms,
-                "p": interp,
-                "impact": str(link.impact) if link.impact else "neutral",
-                "importance": article.importance,
-                "confidence": link.impact_confidence if link.impact_confidence is not None else 1.0,
-                "title": article.title,
-                "source": article.source or "",
-                "url": article.url,
-            }
+            ChartMarker(
+                t=target_ms,
+                p=interp,
+                impact=link.impact or ImpactLabel.NEUTRAL,
+                importance=article.importance,
+                confidence=link.impact_confidence if link.impact_confidence is not None else 1.0,
+                title=article.title,
+                source=article.source or "",
+                url=article.url,
+            )
         )
     return markers
 
@@ -85,12 +99,14 @@ def _build_chart_context(
     prices: list[Price],
     refresh_seconds: int,
 ) -> dict:
-    points = [{"t": _to_epoch_ms(p.fetched_at), "p": p.price} for p in prices]
-    markers: list[dict] = []
+    points: list[ChartPoint] = [ChartPoint(t=_to_epoch_ms(p.fetched_at), p=p.price) for p in prices]
+    markers: list[ChartMarker] = []
     if prices:
+        # Article.published_at is a naive DateTime column; normalize to naive UTC
+        # so the repo's >= comparison stays on the same type.
         since = prices[0].fetched_at
-        if since.tzinfo is None:
-            since = since.replace(tzinfo=timezone.utc)
+        if since.tzinfo is not None:
+            since = since.astimezone(timezone.utc).replace(tzinfo=None)
         evaluated = repo.get_evaluated_articles_for_chart(db, ticker_id, since=since)
         markers = _build_chart_markers(prices, evaluated)
     return {
