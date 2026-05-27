@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.models import Article, ArticleTicker
 from app.repository.ticker import get_by_symbol
 
+_CHART_MARKER_LIMIT = 500
+
 
 class ArticleData(TypedDict):
     url: str
@@ -20,6 +22,28 @@ class ArticleData(TypedDict):
 
 def get_article_by_url(db: Session, url: str) -> Article | None:
     return db.query(Article).filter(Article.url == url).first()
+
+
+def get_evaluated_articles_for_chart(
+    db: Session, ticker_id: str, *, since: datetime, limit: int = _CHART_MARKER_LIMIT
+) -> list[tuple[Article, ArticleTicker]]:
+    # `since` must be naive UTC to match Article.published_at's column type (DateTime, no tz).
+
+    stmt = (
+        sa_select(Article, ArticleTicker)
+        .join(ArticleTicker, Article.id == ArticleTicker.article_id)
+        .where(
+            ArticleTicker.ticker_id == ticker_id,
+            Article.importance.is_not(None),
+            ArticleTicker.impact.is_not(None),
+            Article.published_at.is_not(None),
+            Article.published_at >= since,
+        )
+        .order_by(Article.published_at.asc())
+        .limit(limit)
+    )
+    rows = db.execute(stmt).all()
+    return [(row[0], row[1]) for row in rows]
 
 
 def get_articles_page(

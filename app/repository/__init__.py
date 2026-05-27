@@ -2,6 +2,7 @@ from app.repository.article import (
     ArticleData,
     get_article_by_url,
     get_articles_page,
+    get_evaluated_articles_for_chart,
     upsert_articles,
 )
 from app.repository.evaluation import (
@@ -25,6 +26,7 @@ __all__ = [
     "get_article_by_url",
     "get_articles_page",
     "get_by_symbol",
+    "get_evaluated_articles_for_chart",
     "get_price_history",
     "get_prices_page",
     "get_unevaluated_articles",

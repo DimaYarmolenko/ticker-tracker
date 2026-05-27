@@ -5,43 +5,140 @@
          hx-on::before-swap="if (window.Chart) { var c = this.querySelector('canvas'); if (c) Chart.getChart(c)?.destroy(); }">
   <header class="chart-header">
     <h2><code>{{ ticker }}</code></h2>
-    <span class="muted">{{ points|length }} snapshot{{ '' if points|length == 1 else 's' }}</span>
+    <span class="muted">
+      {{ points|length }} snapshot{{ '' if points|length == 1 else 's' }}
+      {% if markers %} &middot; {{ markers|length }} article{{ '' if markers|length == 1 else 's' }}{% endif %}
+    </span>
   </header>
   {% if points %}
     <div class="chart-canvas-wrapper">
       <canvas id="chart-canvas-{{ ticker }}"></canvas>
     </div>
     <script type="application/json" id="chart-data-{{ ticker }}">{{ points|tojson }}</script>
+    <script type="application/json" id="chart-markers-{{ ticker }}">{{ markers|tojson }}</script>
     <script>
       (function () {
-        var node = document.getElementById("chart-data-{{ ticker }}");
+        var dataNode = document.getElementById("chart-data-{{ ticker }}");
+        var markersNode = document.getElementById("chart-markers-{{ ticker }}");
         var canvas = document.getElementById("chart-canvas-{{ ticker }}");
-        if (!node || !canvas || !window.Chart) return;
-        var data = JSON.parse(node.textContent);
+        if (!dataNode || !canvas || !window.Chart) return;
+        var data = JSON.parse(dataNode.textContent);
+        var markers = markersNode ? JSON.parse(markersNode.textContent) : [];
         var existing = Chart.getChart(canvas);
         if (existing) existing.destroy();
+
+        var IMPACT_COLOR = {
+          positive: "#16a34a",
+          negative: "#dc2626",
+          neutral: "#6b7280",
+        };
+
+        function pad(n) { return n < 10 ? "0" + n : "" + n; }
+        function fmtTs(ms) {
+          var d = new Date(ms);
+          return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate())
+            + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+        }
+
+        function clampConfidence(c) {
+          return Math.max(0.2, Math.min(1, c == null ? 1 : c));
+        }
+
+        var pricePoints = data.map(function (d) { return { x: d.t, y: d.p }; });
+        var markerPoints = markers.map(function (m) { return { x: m.t, y: m.p }; });
+        var markerColors = markers.map(function (m) { return IMPACT_COLOR[m.impact] || IMPACT_COLOR.neutral; });
+        var markerRadii = markers.map(function (m) { return 3 + (m.importance || 1) * 1.5; });
+        var markerBorders = markers.map(function (m) {
+          var hex = IMPACT_COLOR[m.impact] || IMPACT_COLOR.neutral;
+          var r = parseInt(hex.slice(1, 3), 16);
+          var g = parseInt(hex.slice(3, 5), 16);
+          var b = parseInt(hex.slice(5, 7), 16);
+          return "rgba(" + r + "," + g + "," + b + "," + clampConfidence(m.confidence) + ")";
+        });
+
         new Chart(canvas, {
           type: "line",
           data: {
-            labels: data.map(function (d) { return d.t; }),
-            datasets: [{
-              label: "{{ ticker }}",
-              data: data.map(function (d) { return d.p; }),
-              borderColor: "#2d6cdf",
-              backgroundColor: "rgba(45,108,223,0.1)",
-              tension: 0.2,
-              pointRadius: 0,
-              borderWidth: 2,
-              fill: true,
-            }],
+            datasets: [
+              {
+                label: "{{ ticker }}",
+                data: pricePoints,
+                borderColor: "#2d6cdf",
+                backgroundColor: "rgba(45,108,223,0.1)",
+                tension: 0.2,
+                pointRadius: 0,
+                borderWidth: 2,
+                fill: true,
+              },
+              {
+                type: "scatter",
+                label: "Articles",
+                data: markerPoints,
+                pointBackgroundColor: markerColors,
+                pointBorderColor: markerBorders,
+                pointBorderWidth: 2,
+                pointRadius: markerRadii,
+                pointHoverRadius: markerRadii.map(function (r) { return r + 2; }),
+                showLine: false,
+              },
+            ],
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
             animation: false,
-            plugins: { legend: { display: false } },
+            parsing: false,
+            onClick: function (evt, _items, chart) {
+              var hit = chart.getElementsAtEventForMode(evt, "nearest", { intersect: true }, true);
+              if (!hit.length) return;
+              var el = hit[0];
+              if (el.datasetIndex !== 1) return;
+              var marker = markers[el.index];
+              if (marker && marker.url) window.open(marker.url, "_blank", "noopener,noreferrer");
+            },
+            onHover: function (evt, items, chart) {
+              var hit = chart.getElementsAtEventForMode(evt, "nearest", { intersect: true }, true);
+              chart.canvas.style.cursor = (hit.length && hit[0].datasetIndex === 1) ? "pointer" : "default";
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  title: function (items) {
+                    if (!items.length) return "";
+                    var item = items[0];
+                    if (item.datasetIndex === 1) {
+                      var m = markers[item.dataIndex];
+                      return m ? m.title : "";
+                    }
+                    return fmtTs(item.parsed.x);
+                  },
+                  label: function (item) {
+                    if (item.datasetIndex === 1) {
+                      var m = markers[item.dataIndex];
+                      if (!m) return "";
+                      var conf = Math.round((m.confidence == null ? 1 : m.confidence) * 100);
+                      var src = m.source ? m.source + " — " : "";
+                      return src + m.impact + " (" + m.importance + "/5, " + conf + "% confidence)";
+                    }
+                    return "$" + item.parsed.y.toFixed(2);
+                  },
+                  afterLabel: function (item) {
+                    if (item.datasetIndex === 1) return "Click to open article";
+                    return "";
+                  },
+                },
+              },
+            },
             scales: {
-              x: { ticks: { maxTicksLimit: 6, maxRotation: 0 } },
+              x: {
+                type: "linear",
+                ticks: {
+                  maxTicksLimit: 6,
+                  maxRotation: 0,
+                  callback: function (value) { return fmtTs(value); },
+                },
+              },
               y: { ticks: { maxTicksLimit: 6 } },
             },
           },
