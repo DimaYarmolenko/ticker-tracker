@@ -1,5 +1,10 @@
 import json
 import re
+from datetime import datetime, timezone
+
+import app.repository as repo
+from app.evaluator import ArticleEvaluation, TickerImpact
+from app.models import ImpactLabel, Price
 
 
 def test_index_renders(client):
@@ -154,6 +159,16 @@ def _extract_chart_points(body: str, symbol: str) -> list[dict]:
     return json.loads(match.group(1))
 
 
+def _extract_chart_markers(body: str, symbol: str) -> list[dict]:
+    match = re.search(
+        rf'<script type="application/json" id="chart-markers-{symbol}">(.*?)</script>',
+        body,
+        re.DOTALL,
+    )
+    assert match, f"chart-markers-{symbol} script not found"
+    return json.loads(match.group(1))
+
+
 def test_get_chart_renders_section_with_auto_refresh(client, seeded_tickers, seeded_prices):
     response = client.get("/ui/tickers/AAPL/chart")
     assert response.status_code == 200
@@ -171,6 +186,74 @@ def test_get_chart_embeds_points_in_ascending_order(client, seeded_tickers, seed
     assert [p["p"] for p in points] == [175.50, 176.20]
     timestamps = [p["t"] for p in points]
     assert timestamps == sorted(timestamps)
+
+
+def test_get_chart_markers_empty_when_no_evaluations(client, seeded_articles, seeded_prices):
+    response = client.get("/ui/tickers/AAPL/chart")
+    assert _extract_chart_markers(response.text, "AAPL") == []
+
+
+def _seed_prices_around_article(db_session, ticker_id: str) -> None:
+    """Insert AAPL prices straddling the seeded article's 2026-04-28 10:00 UTC timestamp."""
+    db_session.add_all(
+        [
+            Price(
+                ticker_id=ticker_id,
+                price=175.0,
+                fetched_at=datetime(2026, 4, 28, 9, 0, tzinfo=timezone.utc),
+            ),
+            Price(
+                ticker_id=ticker_id,
+                price=177.0,
+                fetched_at=datetime(2026, 4, 28, 11, 0, tzinfo=timezone.utc),
+            ),
+        ]
+    )
+    db_session.commit()
+
+
+def test_get_chart_markers_include_evaluated_articles(client, db_session, seeded_articles):
+    aapl = repo.get_by_symbol(db_session, "AAPL")
+    assert aapl is not None
+    _seed_prices_around_article(db_session, aapl.id)
+
+    article = next(
+        a for a in repo.get_unevaluated_articles(db_session, limit=10) if "AAPL" in a.title
+    )
+    repo.save_evaluations(
+        db_session,
+        [
+            ArticleEvaluation(
+                article_id=article.id,
+                importance=4,
+                impacts=[
+                    TickerImpact(symbol="AAPL", impact=ImpactLabel.POSITIVE, confidence=0.85),
+                ],
+            )
+        ],
+        version="v1",
+    )
+
+    response = client.get("/ui/tickers/AAPL/chart")
+    markers = _extract_chart_markers(response.text, "AAPL")
+
+    assert len(markers) == 1
+    m = markers[0]
+    assert m["impact"] == "positive"
+    assert m["importance"] == 4
+    assert m["confidence"] == 0.85
+    assert m["url"] == article.url
+    assert m["title"] == article.title
+    assert isinstance(m["t"], int)
+    # Interpolated halfway between 175.0 (09:00) and 177.0 (11:00) → 176.0.
+    assert m["p"] == 176.0
+
+
+def test_get_chart_points_are_epoch_ms(client, seeded_tickers, seeded_prices):
+    """Points must use numeric epoch-ms so the chart's linear x-axis can plot markers alongside."""
+    response = client.get("/ui/tickers/AAPL/chart")
+    points = _extract_chart_points(response.text, "AAPL")
+    assert all(isinstance(p["t"], int) for p in points)
 
 
 def test_get_chart_empty_state_when_no_prices(client, seeded_tickers):

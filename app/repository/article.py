@@ -22,6 +22,26 @@ def get_article_by_url(db: Session, url: str) -> Article | None:
     return db.query(Article).filter(Article.url == url).first()
 
 
+def get_evaluated_articles_for_chart(
+    db: Session, ticker_id: str, *, since: datetime, limit: int = 500
+) -> list[tuple[Article, ArticleTicker]]:
+    stmt = (
+        sa_select(Article, ArticleTicker)
+        .join(ArticleTicker, Article.id == ArticleTicker.article_id)
+        .where(
+            ArticleTicker.ticker_id == ticker_id,
+            Article.importance.is_not(None),
+            ArticleTicker.impact.is_not(None),
+            Article.published_at.is_not(None),
+            Article.published_at >= since,
+        )
+        .order_by(Article.published_at.asc())
+        .limit(limit)
+    )
+    rows = db.execute(stmt).all()
+    return [(row[0], row[1]) for row in rows]
+
+
 def get_articles_page(
     db: Session, ticker_id: str, limit: int = 20, offset: int = 0
 ) -> tuple[list[tuple[Article, ArticleTicker]], int]:
