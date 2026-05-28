@@ -24,6 +24,7 @@ templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 _CHART_HISTORY_LIMIT = 2000
 _ARTICLES_INITIAL_LIMIT = 20
 _MIN_REFRESH_SECONDS = 60
+_IMPORTANT_IMPORTANCE_THRESHOLD = 4
 
 
 class ChartPoint(TypedDict):
@@ -131,6 +132,8 @@ def _build_articles_context(
             "source": article.source,
             "published_at": article.published_at,
             "importance": article.importance,
+            "is_important": article.importance is not None
+            and article.importance >= _IMPORTANT_IMPORTANCE_THRESHOLD,
             "impact": link.impact,
             "impact_confidence": link.impact_confidence,
         }

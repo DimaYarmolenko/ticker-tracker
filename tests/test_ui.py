@@ -111,7 +111,7 @@ def test_get_articles_renders_titles(client, seeded_articles):
     assert response.status_code == 200
     assert "AAPL hits new high" in response.text
     assert "Tech giants rally" in response.text
-    assert "Load more" not in response.text
+    assert "sentinel" not in response.text
 
 
 def test_get_articles_unknown_ticker_returns_404(client):
@@ -135,10 +135,11 @@ def test_get_articles_empty_for_known_ticker(client, seeded_tickers):
     assert "No articles yet" in response.text
 
 
-def test_get_articles_load_more_appears_when_total_exceeds_limit(client, seeded_articles):
+def test_get_articles_sentinel_appears_when_total_exceeds_limit(client, seeded_articles):
     response = client.get("/ui/tickers/AAPL/articles?limit=1")
     assert response.status_code == 200
-    assert "Load more" in response.text
+    assert 'class="sentinel"' in response.text
+    assert 'hx-trigger="revealed"' in response.text
     assert "offset=1" in response.text
 
 

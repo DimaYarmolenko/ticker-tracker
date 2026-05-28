@@ -208,15 +208,23 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
 .article {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding-bottom: 14px;
+  gap: 5px;
+  padding: 14px 0 14px 14px;
   border-bottom: 1px solid var(--border);
+  border-left: 2px solid transparent;
+  margin-left: -14px;
+  transition: border-left-color 150ms;
 }
+.article:first-child { padding-top: 0; }
 .article:last-of-type { border-bottom: none; padding-bottom: 0; }
+.article:hover { border-left-color: var(--border); }
+.article.important { border-left-color: var(--accent); }
+.article.important:hover { border-left-color: var(--accent-hover); }
 .article-title {
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text);
+  line-height: 1.4;
 }
 .article-title:hover { color: var(--accent); text-decoration: none; }
 .article-meta {
@@ -225,12 +233,12 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
   font-size: 12px;
   color: var(--muted);
 }
-.article-meta span + span::before {
+.article-source + .article-date::before {
   content: "·";
   margin-right: 10px;
   color: var(--border);
 }
-.article-meta span + span { margin-left: -10px; }
+.article-source + .article-date { margin-left: -10px; }
 
 .badges {
   display: flex;
@@ -251,17 +259,20 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
 .badge-impact-negative { background: var(--neg-bg); color: var(--neg); }
 .badge-impact-neutral  { background: var(--neu-bg); color: var(--neu); }
 
-.load-more {
-  display: inline-block;
-  margin-top: 14px;
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 13px;
-  cursor: pointer;
-  background: var(--surface);
+.sentinel {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0 4px;
 }
-.load-more:hover { border-color: var(--accent); text-decoration: none; }
+.sentinel-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* States */
 .empty {

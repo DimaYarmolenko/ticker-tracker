@@ -35,7 +35,7 @@ There are example files @.env.example and @.test.env.example where you can see w
 # Web UI
 - A minimal web UI is served at `/` by the same FastAPI app — Jinja2 templates progressively enhanced with HTMX (no build step, no SPA framework). Routes live in @app/ui.py; the JSON API in @app/main.py is untouched.
 - Templates live in `app/templates/` (`base.html`, `index.html`, `_tickers.html`, `_articles.html`). Static assets (`style.css`, vendored `htmx.min.js`) live in `app/static/` and are mounted at `/static`.
-- HTML routes: `GET /` (full page), `GET/POST/DELETE /ui/tickers` (sidebar partial), `GET /ui/tickers/{symbol}/articles?limit&offset` (articles partial). The article partial renders as a full `<section id="articles">` when `offset == 0` and as bare rows + a new "Load more" link when `offset > 0`, so HTMX `outerHTML` swaps append cleanly.
+- HTML routes: `GET /` (full page), `GET/POST/DELETE /ui/tickers` (sidebar partial), `GET /ui/tickers/{symbol}/articles?limit&offset` (articles partial). The article partial renders as a full `<section id="articles">` when `offset == 0` and as bare rows + a `revealed`-triggered `.sentinel` div when `offset > 0`. The sentinel auto-loads the next page via `hx-swap="outerHTML"` as it scrolls into view (infinite scroll), and each page's response carries a fresh sentinel so swaps append cleanly.
 - UI mutations return rendered partials (never raise `HTTPException`); user-facing errors (duplicate add, unknown delete) render as an inline `.error` banner in the sidebar partial.
 
 # Commands
