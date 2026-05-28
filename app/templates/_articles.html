@@ -1,9 +1,9 @@
 {% macro article_item(a) %}
-  <article class="article">
+  <article class="article{% if a.importance is not none and a.importance >= 4 %} important{% endif %}">
     <a class="article-title" href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.title }}</a>
     <div class="article-meta">
-      {% if a.source %}<span>{{ a.source }}</span>{% endif %}
-      {% if a.published_at %}<span>{{ a.published_at.strftime('%Y-%m-%d %H:%M') }}</span>{% endif %}
+      {% if a.source %}<span class="article-source">{{ a.source }}</span>{% endif %}
+      {% if a.published_at %}<span class="article-date">{{ a.published_at.strftime('%b %d, %Y') }}</span>{% endif %}
     </div>
     {% if a.importance is not none or a.impact %}
       <div class="badges">
@@ -21,11 +21,14 @@
   </article>
 {% endmacro %}
 
-{% macro load_more(ticker, next_offset) %}
-  <a class="load-more"
-     hx-get="/ui/tickers/{{ ticker }}/articles?offset={{ next_offset }}"
-     hx-target="this"
-     hx-swap="outerHTML">Load more</a>
+{% macro sentinel(ticker, next_offset) %}
+  <div class="sentinel"
+       hx-get="/ui/tickers/{{ ticker }}/articles?offset={{ next_offset }}"
+       hx-trigger="revealed"
+       hx-target="this"
+       hx-swap="outerHTML">
+    <span class="sentinel-spinner"></span>
+  </div>
 {% endmacro %}
 
 {% if is_initial %}
@@ -38,7 +41,7 @@
   {% if articles %}
     <div class="article-list">
       {% for a in articles %}{{ article_item(a) }}{% endfor %}
-      {% if has_more %}{{ load_more(ticker, next_offset) }}{% endif %}
+      {% if has_more %}{{ sentinel(ticker, next_offset) }}{% endif %}
     </div>
   {% else %}
     <p class="empty">No articles yet for {{ ticker }}.</p>
@@ -46,5 +49,5 @@
 </section>
 {% else %}
   {% for a in articles %}{{ article_item(a) }}{% endfor %}
-  {% if has_more %}{{ load_more(ticker, next_offset) }}{% endif %}
+  {% if has_more %}{{ sentinel(ticker, next_offset) }}{% endif %}
 {% endif %}
