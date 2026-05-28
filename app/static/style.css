@@ -233,7 +233,7 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
   font-size: 12px;
   color: var(--muted);
 }
-.article-date::before {
+.article-source + .article-date::before {
   content: "·";
   margin-right: 10px;
   color: var(--border);

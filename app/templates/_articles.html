@@ -1,5 +1,5 @@
 {% macro article_item(a) %}
-  <article class="article{% if a.importance is not none and a.importance >= 4 %} important{% endif %}">
+  <article class="article{% if a.is_important %} important{% endif %}">
     <a class="article-title" href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.title }}</a>
     <div class="article-meta">
       {% if a.source %}<span class="article-source">{{ a.source }}</span>{% endif %}
