@@ -3,6 +3,12 @@
 {% block content %}
 <header class="topbar">
   <h1>Ticker Tracker</h1>
+  <div class="topbar-user">
+    <span class="user-email">{{ current_user.email }}</span>
+    <form method="post" action="/logout" class="logout-form">
+      <button type="submit">Sign out</button>
+    </form>
+  </div>
 </header>
 
 <main class="layout">

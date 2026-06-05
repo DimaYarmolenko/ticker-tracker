@@ -11,14 +11,12 @@ def get_by_symbol(db: Session, symbol: str) -> Ticker | None:
     return db.query(Ticker).filter(Ticker.symbol == symbol).first()
 
 
-def create(db: Session, symbol: str) -> Ticker:
+def get_or_create(db: Session, symbol: str) -> Ticker:
+    existing = get_by_symbol(db, symbol)
+    if existing is not None:
+        return existing
     ticker = Ticker(symbol=symbol)
     db.add(ticker)
     db.commit()
     db.refresh(ticker)
     return ticker
-
-
-def delete(db: Session, ticker: Ticker) -> None:
-    db.delete(ticker)
-    db.commit()

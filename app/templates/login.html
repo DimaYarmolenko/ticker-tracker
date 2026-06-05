@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Sign in · Ticker Tracker{% endblock %}
+
+{% block content %}
+<header class="topbar">
+  <h1>Ticker Tracker</h1>
+</header>
+
+<main class="auth-pane">
+  <form class="auth-form" method="post" action="/login">
+    <h2>Sign in</h2>
+    {% if error %}
+      <div class="error" role="alert">{{ error }}</div>
+    {% endif %}
+    <label>
+      <span>Email</span>
+      <input type="email" name="email" value="{{ email or '' }}" autocomplete="email" required autofocus>
+    </label>
+    <label>
+      <span>Password</span>
+      <input type="password" name="password" autocomplete="current-password" required>
+    </label>
+    <button type="submit">Sign in</button>
+    <p class="auth-alt">No account? <a href="/register">Create one</a></p>
+  </form>
+</main>
+{% endblock %}
