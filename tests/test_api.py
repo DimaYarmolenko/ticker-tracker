@@ -103,7 +103,7 @@ def test_user_cannot_see_another_users_tickers(client, db_session):
     """User A's subscriptions stay hidden from user B even though tickers are global."""
     client.post("/tickers", json={"symbol": "AAPL"})
 
-    other = repo.create_user(db_session, "other@example.com", hash_password("super-secret"))
+    repo.create_user(db_session, "other@example.com", hash_password("super-secret"))
     client.cookies.clear()
     client.post(
         "/login",
@@ -117,15 +117,39 @@ def test_user_cannot_see_another_users_tickers(client, db_session):
     assert client.get("/tickers/AAPL/prices").status_code == 404
     # The global ticker row still exists in the DB.
     assert repo.get_by_symbol(db_session, "AAPL") is not None
-    # Quiet pyright/lint: `other` is used to seed the DB row for the login call.
-    assert other.email == "other@example.com"
 
 
-def test_resubscribing_after_unsubscribe_reattaches_data(client):
-    """After a user removes a ticker, re-adding it surfaces existing data again."""
+def test_resubscribing_after_unsubscribe_reattaches_data(client, db_session):
+    """After a user removes a ticker, re-adding it surfaces existing global articles again."""
+    from datetime import datetime, timezone
+
     client.post("/tickers", json={"symbol": "AAPL"})
+
+    # Seed a global article against AAPL so we can prove it survives unsubscribe.
+    repo.upsert_articles(
+        db_session,
+        [
+            {
+                "url": "https://example.com/aapl-resub",
+                "title": "AAPL news",
+                "summary": "summary",
+                "source": "TestSource",
+                "published_at": datetime(2026, 4, 28, 10, 0, 0, tzinfo=timezone.utc),
+                "ticker_symbols": ["AAPL"],
+            }
+        ],
+    )
+    assert any(
+        a["url"] == "https://example.com/aapl-resub"
+        for a in client.get("/tickers/AAPL/news").json()["articles"]
+    )
+
     client.delete("/tickers/AAPL")
+    # After unsubscribe, the article row stays in the DB but the user can't see it.
+    assert client.get("/tickers/AAPL/news").status_code == 404
+
     response = client.post("/tickers", json={"symbol": "AAPL"})
     assert response.status_code == 201
-    listing = client.get("/tickers").json()
-    assert any(t["symbol"] == "AAPL" for t in listing)
+    # Resubscribe surfaces the still-attached article.
+    articles = client.get("/tickers/AAPL/news").json()["articles"]
+    assert any(a["url"] == "https://example.com/aapl-resub" for a in articles)

@@ -1,3 +1,4 @@
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Ticker, UserTicker
@@ -23,11 +24,19 @@ def is_subscribed(db: Session, user_id: str, ticker_id: str) -> bool:
 
 
 def subscribe(db: Session, user_id: str, ticker: Ticker) -> bool:
-    """Subscribe a user to a ticker. Returns False if already subscribed."""
+    """Subscribe a user to a ticker. Returns False if already subscribed.
+
+    Catches ``IntegrityError`` from a racing concurrent insert (same composite
+    PK) and treats it as a benign duplicate.
+    """
     if is_subscribed(db, user_id, ticker.id):
         return False
     db.add(UserTicker(user_id=user_id, ticker_id=ticker.id))
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return False
     return True
 
 

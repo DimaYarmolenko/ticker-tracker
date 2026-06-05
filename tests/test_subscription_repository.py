@@ -1,8 +1,11 @@
-from fastapi.testclient import TestClient
+import pytest
 from sqlalchemy.orm import Session
 
 import app.repository as repo
 from app.auth import hash_password
+from app.models import UserTicker
+from app.repository import subscription as subscription_module
+from tests.conftest import TestingSessionLocal
 
 
 def test_subscribe_is_idempotent(db_session: Session, seeded_user) -> None:
@@ -53,9 +56,7 @@ def test_two_users_can_share_a_ticker(db_session: Session, seeded_user) -> None:
     assert repo.is_subscribed(db_session, user_b.id, aapl.id)
 
 
-def test_unsubscribe_one_user_does_not_affect_other(
-    db_session: Session, seeded_user, anon_client: TestClient
-) -> None:
+def test_unsubscribe_one_user_does_not_affect_other(db_session: Session, seeded_user) -> None:
     user_b = repo.create_user(db_session, "other@example.com", hash_password("super-secret"))
     aapl = repo.get_or_create(db_session, "AAPL")
     repo.subscribe(db_session, seeded_user.id, aapl)
@@ -67,3 +68,26 @@ def test_unsubscribe_one_user_does_not_affect_other(
     assert repo.is_subscribed(db_session, user_b.id, aapl.id)
     # And the global ticker row itself is untouched.
     assert repo.get_by_symbol(db_session, "AAPL") is not None
+
+
+def test_subscribe_tolerates_concurrent_insert(
+    db_session: Session, seeded_user, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A concurrent insert between is_subscribed() and commit() must surface
+    as a clean ``False`` return, not a raised IntegrityError."""
+    aapl = repo.get_or_create(db_session, "AAPL")
+
+    # Pre-insert the row from a separate session — simulates a racing request
+    # that committed first. db_session has not seen it yet.
+    with TestingSessionLocal() as other:
+        other.add(UserTicker(user_id=seeded_user.id, ticker_id=aapl.id))
+        other.commit()
+
+    # Force is_subscribed() to miss so subscribe() proceeds to the INSERT and
+    # hits the composite-PK IntegrityError that we want to swallow.
+    monkeypatch.setattr(subscription_module, "is_subscribed", lambda *_args, **_kw: False)
+
+    assert repo.subscribe(db_session, seeded_user.id, aapl) is False
+    # Session must remain usable after the rollback.
+    monkeypatch.undo()
+    assert repo.is_subscribed(db_session, seeded_user.id, aapl.id)

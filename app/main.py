@@ -4,13 +4,14 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, AsyncGenerator
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 import app.repository as repo
-from app.auth import current_user
+from app.auth import AuthRedirect, current_user
 from app.auth_routes import router as auth_router
 from app.database import get_db
 from app.models import User
@@ -42,11 +43,33 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 _SESSION_SECRET = os.environ["SESSION_SECRET_KEY"]
 
+
+def _env_bool(name: str, *, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+_SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", default=False)
+
 app = FastAPI(title="Ticker Tracker", lifespan=lifespan)
-app.add_middleware(SessionMiddleware, secret_key=_SESSION_SECRET, same_site="lax", https_only=False)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=_SESSION_SECRET,
+    same_site="lax",
+    https_only=_SESSION_COOKIE_SECURE,
+)
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 app.include_router(auth_router)
 app.include_router(ui_router)
+
+
+@app.exception_handler(AuthRedirect)
+def _handle_auth_redirect(request: Request, _exc: AuthRedirect) -> Response:
+    if request.headers.get("HX-Request") == "true":
+        return Response(status_code=status.HTTP_204_NO_CONTENT, headers={"HX-Redirect": "/login"})
+    return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.get("/tickers", response_model=list[TickerResponse])

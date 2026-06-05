@@ -1,3 +1,4 @@
+import hashlib
 from enum import StrEnum
 
 import bcrypt
@@ -18,13 +19,19 @@ def _prepare(plain: str) -> bytes:
     encoded = plain.encode("utf-8")
     if len(encoded) <= _BCRYPT_MAX_BYTES:
         return encoded
-    import hashlib
-
     return hashlib.sha256(encoded).hexdigest().encode("ascii")
 
 
 class SessionKey(StrEnum):
     USER_ID = "user_id"
+
+
+class AuthRedirect(Exception):
+    """Raised by HTML-route auth dependencies to trigger a redirect to /login.
+
+    The exception handler in `app.main` translates this into either an
+    `HX-Redirect` 204 response (for HTMX requests) or a normal 303 redirect.
+    """
 
 
 def hash_password(plain: str) -> str:
@@ -59,7 +66,7 @@ def current_user_or_redirect(request: Request, db: Session = Depends(get_db)) ->
     user = _load_user(request, db)
     if user is None:
         request.session.clear()
-        raise HTTPException(status_code=status.HTTP_303_SEE_OTHER, headers={"Location": "/login"})
+        raise AuthRedirect()
     return user
 
 

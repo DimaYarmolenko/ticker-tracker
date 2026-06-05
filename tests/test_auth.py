@@ -101,3 +101,25 @@ class TestAnonymousAccess:
         response = client.get("/login", follow_redirects=False)
         assert response.status_code == 303
         assert response.headers["location"] == "/"
+
+
+class TestHtmxAwareRedirect:
+    """Anonymous access to UI partial routes must redirect cleanly even for
+    HTMX-triggered XHRs, which otherwise would swap the full login HTML into
+    whatever container made the request."""
+
+    def test_plain_browser_request_gets_303_redirect(self, anon_client: TestClient) -> None:
+        response = anon_client.get("/ui/tickers", follow_redirects=False)
+        assert response.status_code == 303
+        assert response.headers["location"] == "/login"
+
+    def test_htmx_partial_request_gets_hx_redirect_header(self, anon_client: TestClient) -> None:
+        response = anon_client.get(
+            "/ui/tickers/AAPL/articles",
+            headers={"HX-Request": "true"},
+            follow_redirects=False,
+        )
+        assert response.status_code == 204
+        assert response.headers["hx-redirect"] == "/login"
+        # No login HTML body that HTMX would otherwise swap into a partial slot.
+        assert response.text == ""
