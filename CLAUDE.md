@@ -34,9 +34,17 @@ There are example files @.env.example and @.test.env.example where you can see w
 
 # Web UI
 - A minimal web UI is served at `/` by the same FastAPI app — Jinja2 templates progressively enhanced with HTMX (no build step, no SPA framework). Routes live in @app/ui.py; the JSON API in @app/main.py is untouched.
-- Templates live in `app/templates/` (`base.html`, `index.html`, `_tickers.html`, `_articles.html`). Static assets (`style.css`, vendored `htmx.min.js`) live in `app/static/` and are mounted at `/static`.
+- Templates live in `app/templates/` (`base.html`, `index.html`, `_tickers.html`, `_articles.html`, `login.html`, `register.html`). Static assets (`style.css`, vendored `htmx.min.js`) live in `app/static/` and are mounted at `/static`.
 - HTML routes: `GET /` (full page), `GET/POST/DELETE /ui/tickers` (sidebar partial), `GET /ui/tickers/{symbol}/articles?limit&offset` (articles partial). The article partial renders as a full `<section id="articles">` when `offset == 0` and as bare rows + a `revealed`-triggered `.sentinel` div when `offset > 0`. The sentinel auto-loads the next page via `hx-swap="outerHTML"` as it scrolls into view (infinite scroll), and each page's response carries a fresh sentinel so swaps append cleanly.
 - UI mutations return rendered partials (never raise `HTTPException`); user-facing errors (duplicate add, unknown delete) render as an inline `.error` banner in the sidebar partial.
+
+# Authentication
+- All `/ui/*` and `/` HTML routes plus the JSON `/tickers*` routes require an authenticated session. Auth dependencies live in @app/auth.py: `current_user` (JSON, 401 on failure) and `current_user_or_redirect` (HTML, raises `AuthRedirect`).
+- Auth route surface in @app/auth_routes.py: `GET/POST /login`, `GET/POST /register`, `POST /logout`. Sessions are cookie-based via `starlette.middleware.sessions.SessionMiddleware` configured in @app/main.py.
+- `AuthRedirect` is handled centrally in @app/main.py: HTMX requests (`HX-Request: true`) receive `204 + HX-Redirect: /login` so HTMX does a full navigation; non-HTMX requests receive `303 + Location: /login`.
+- Passwords are hashed with bcrypt (see `hash_password` / `verify_password` in @app/auth.py); inputs longer than 72 bytes are SHA-256 pre-hashed so bcrypt's truncation does not cost entropy. `MIN_PASSWORD_LENGTH = 8` is enforced in `_validate_credentials`.
+- Tickers, articles, and prices remain global. Per-user subscriptions live in `user_tickers` (see `UserTicker` in @app/models.py); repository helpers are in @app/repository/subscription.py.
+- Required env vars: `SESSION_SECRET_KEY` (long random string). Optional: `SESSION_COOKIE_SECURE` (default `false` for local HTTP dev; production deployments behind TLS should set it to `true`).
 
 # Commands
 Most common commands, try to use them instead of creating your own

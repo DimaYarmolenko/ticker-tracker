@@ -11,9 +11,10 @@ from sqlalchemy.orm import Session, sessionmaker
 
 import app.repository as repo
 from alembic import command
+from app.auth import hash_password
 from app.database import Base, get_db
 from app.main import app
-from app.models import Ticker
+from app.models import Ticker, User
 from app.repository import PriceData
 
 TEST_DATABASE_URL = (
@@ -22,6 +23,9 @@ TEST_DATABASE_URL = (
 )
 
 _ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
+
+TEST_USER_EMAIL = "test@example.com"
+TEST_USER_PASSWORD = "test-password"
 
 test_engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
@@ -55,7 +59,33 @@ def db_session(clean_tables: None) -> Generator[Session, None, None]:
 
 
 @pytest.fixture
-def client(db_session: Session) -> Generator[TestClient, None, None]:
+def seeded_user(db_session: Session) -> User:
+    return repo.create_user(db_session, TEST_USER_EMAIL, hash_password(TEST_USER_PASSWORD))
+
+
+@pytest.fixture
+def client(db_session: Session, seeded_user: User) -> Generator[TestClient, None, None]:
+    """Authenticated TestClient logged in as the seeded user."""
+
+    def override_get_db() -> Generator[Session, None, None]:
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    test_client = TestClient(app)
+    response = test_client.post(
+        "/login",
+        data={"email": TEST_USER_EMAIL, "password": TEST_USER_PASSWORD},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303, response.text
+    yield test_client
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def anon_client(db_session: Session) -> Generator[TestClient, None, None]:
+    """Unauthenticated TestClient (no session cookie)."""
+
     def override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
@@ -65,10 +95,12 @@ def client(db_session: Session) -> Generator[TestClient, None, None]:
 
 
 @pytest.fixture
-def seeded_tickers(db_session: Session) -> list[Ticker]:
-    """Pre-populate the database with a known set of tickers."""
-    ticker_a = repo.create(db_session, "AAPL")
-    ticker_b = repo.create(db_session, "MSFT")
+def seeded_tickers(db_session: Session, seeded_user: User) -> list[Ticker]:
+    """Global tickers plus subscriptions for the seeded user."""
+    ticker_a = repo.get_or_create(db_session, "AAPL")
+    ticker_b = repo.get_or_create(db_session, "MSFT")
+    repo.subscribe(db_session, seeded_user.id, ticker_a)
+    repo.subscribe(db_session, seeded_user.id, ticker_b)
     return [ticker_a, ticker_b]
 
 
