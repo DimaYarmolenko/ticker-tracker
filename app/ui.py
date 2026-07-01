@@ -280,7 +280,7 @@ def ui_ticker_view(
     if not ticker:
         return templates.TemplateResponse(
             request,
-            "_chart_not_found.html",
+            "_view_not_found.html",
             {"ticker": upper},
             status_code=status.HTTP_404_NOT_FOUND,
         )
