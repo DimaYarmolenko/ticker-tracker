@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ticker-tracker
+
+# The env Secret (ticker-tracker-env) is NOT listed here — it is generated from the
+# repo-root .env file by k8s/deploy.sh (kubectl create secret --from-env-file). Run
+# deploy.sh rather than a bare `kubectl apply -k` so the secret exists first.
+resources:
+  - namespace.yaml
+  - postgres.yaml
+  - app.yaml
+  - ingress.yaml
