@@ -29,7 +29,7 @@ class Ticker(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     symbol: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
     date_added: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     articles: Mapped[list["Article"]] = relationship(
         "Article", secondary=ArticleTicker.__table__, back_populates="tickers"
@@ -47,12 +47,12 @@ class Article(Base):
     title: Mapped[str] = mapped_column(Text, nullable=False)
     summary: Mapped[str | None] = mapped_column(Text)
     source: Mapped[str | None] = mapped_column(String(200))
-    published_at: Mapped[datetime | None] = mapped_column(DateTime)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     fetched_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     importance: Mapped[int | None] = mapped_column(Integer)
-    evaluated_at: Mapped[datetime | None] = mapped_column(DateTime)
+    evaluated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     evaluator_version: Mapped[str | None] = mapped_column(String(40))
     tickers: Mapped[list["Ticker"]] = relationship(
         "Ticker", secondary=ArticleTicker.__table__, back_populates="articles"
