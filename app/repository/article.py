@@ -6,6 +6,7 @@ from sqlalchemy import select as sa_select
 from sqlalchemy.orm import Session
 
 from app.models import Article, ArticleTicker
+from app.repository._pagination import paginate
 from app.repository.ticker import get_by_symbol
 
 _CHART_MARKER_LIMIT = 500
@@ -27,7 +28,8 @@ def get_article_by_url(db: Session, url: str) -> Article | None:
 def get_evaluated_articles_for_chart(
     db: Session, ticker_id: str, *, since: datetime, limit: int = _CHART_MARKER_LIMIT
 ) -> list[tuple[Article, ArticleTicker]]:
-    # `since` must be naive UTC to match Article.published_at's column type (DateTime, no tz).
+    # `since` is tz-aware, matching Article.published_at's TIMESTAMPTZ column; the
+    # `>=` comparison below is aware-vs-aware.
 
     stmt = (
         sa_select(Article, ArticleTicker)
@@ -49,29 +51,19 @@ def get_evaluated_articles_for_chart(
 def get_articles_page(
     db: Session, ticker_id: str, limit: int = 20, offset: int = 0
 ) -> tuple[list[tuple[Article, ArticleTicker]], int]:
-    count_sub = (
-        sa_select(func.count(Article.id))
-        .join(ArticleTicker, Article.id == ArticleTicker.article_id)
-        .where(ArticleTicker.ticker_id == ticker_id)
-        .scalar_subquery()
-    )
-    stmt = (
-        sa_select(Article, ArticleTicker, count_sub.label("total"))
+    base_stmt = (
+        sa_select(Article, ArticleTicker)
         .join(ArticleTicker, Article.id == ArticleTicker.article_id)
         .where(ArticleTicker.ticker_id == ticker_id)
         .order_by(Article.published_at.desc().nulls_last())
-        .offset(offset)
-        .limit(limit)
     )
-    rows = db.execute(stmt).all()
-    if rows:
-        return [(row[0], row[1]) for row in rows], rows[0][2]
-    total = db.scalar(
+    count_stmt = (
         sa_select(func.count(Article.id))
         .join(ArticleTicker, Article.id == ArticleTicker.article_id)
         .where(ArticleTicker.ticker_id == ticker_id)
     )
-    return [], total or 0
+    rows, total = paginate(db, base_stmt, count_stmt, limit=limit, offset=offset)
+    return [(row[0], row[1]) for row in rows], total
 
 
 def upsert_articles(db: Session, articles_data: list[ArticleData]) -> None:

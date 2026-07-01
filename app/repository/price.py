@@ -5,6 +5,9 @@ from sqlalchemy import select as sa_select
 from sqlalchemy.orm import Session
 
 from app.models import Price, Ticker
+from app.repository._pagination import paginate
+
+PRICE_HISTORY_LIMIT = 2000
 
 
 class PriceData(TypedDict):
@@ -19,25 +22,15 @@ class PriceData(TypedDict):
 def get_prices_page(
     db: Session, ticker_id: str, limit: int = 20, offset: int = 0
 ) -> tuple[list[Price], int]:
-    count_sub = (
-        sa_select(func.count(Price.id)).where(Price.ticker_id == ticker_id).scalar_subquery()
+    base_stmt = (
+        sa_select(Price).where(Price.ticker_id == ticker_id).order_by(Price.fetched_at.desc())
     )
-    stmt = (
-        sa_select(Price, count_sub.label("total"))
-        .where(Price.ticker_id == ticker_id)
-        .order_by(Price.fetched_at.desc())
-        .offset(offset)
-        .limit(limit)
-    )
-    rows = db.execute(stmt).all()
-    if rows:
-        return [row[0] for row in rows], rows[0][1]
-    # Fallback when offset > total: rows is empty so count_sub is not in result
-    total = db.scalar(sa_select(func.count(Price.id)).where(Price.ticker_id == ticker_id))
-    return [], total or 0
+    count_stmt = sa_select(func.count(Price.id)).where(Price.ticker_id == ticker_id)
+    rows, total = paginate(db, base_stmt, count_stmt, limit=limit, offset=offset)
+    return [row[0] for row in rows], total
 
 
-def get_price_history(db: Session, ticker_id: str, limit: int = 2000) -> list[Price]:
+def get_price_history(db: Session, ticker_id: str, limit: int = PRICE_HISTORY_LIMIT) -> list[Price]:
     stmt = (
         sa_select(Price)
         .where(Price.ticker_id == ticker_id)

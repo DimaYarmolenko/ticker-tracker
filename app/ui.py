@@ -1,5 +1,4 @@
 import bisect
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, TypedDict
@@ -11,8 +10,9 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 import app.repository as repo
+from app.config import read_int_env
 from app.database import get_db
-from app.models import Article, ArticleTicker, ImpactLabel, Price
+from app.models import Article, ArticleTicker, ImpactLabel, Price, Ticker
 from app.schemas import TickerCreate
 
 router = APIRouter()
@@ -21,7 +21,6 @@ _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
 
-_CHART_HISTORY_LIMIT = 2000
 _ARTICLES_INITIAL_LIMIT = 20
 _MIN_REFRESH_SECONDS = 60
 _IMPORTANT_IMPORTANCE_THRESHOLD = 4
@@ -44,10 +43,7 @@ class ChartMarker(TypedDict):
 
 
 def _chart_refresh_seconds() -> int:
-    try:
-        minutes = int(os.getenv("PRICE_POLL_INTERVAL_MINUTES", "30"))
-    except ValueError:
-        minutes = 30
+    minutes = read_int_env("PRICE_POLL_INTERVAL_MINUTES", required=False, default=30)
     return max(_MIN_REFRESH_SECONDS, minutes * 60)
 
 
@@ -103,11 +99,9 @@ def _build_chart_context(
     points: list[ChartPoint] = [ChartPoint(t=_to_epoch_ms(p.fetched_at), p=p.price) for p in prices]
     markers: list[ChartMarker] = []
     if prices:
-        # Article.published_at is a naive DateTime column; normalize to naive UTC
-        # so the repo's >= comparison stays on the same type.
+        # Both Price.fetched_at and Article.published_at are tz-aware, so the
+        # repo's >= comparison is aware-vs-aware — pass the timestamp straight through.
         since = prices[0].fetched_at
-        if since.tzinfo is not None:
-            since = since.astimezone(timezone.utc).replace(tzinfo=None)
         evaluated = repo.get_evaluated_articles_for_chart(db, ticker_id, since=since)
         markers = _build_chart_markers(prices, evaluated)
     return {
@@ -224,6 +218,22 @@ def ui_delete_ticker(request: Request, symbol: str, db: Session = Depends(get_db
     return _render_tickers(request, db)
 
 
+def _lookup_or_not_found(
+    request: Request, db: Session, symbol: str, not_found_template: str
+) -> Ticker | HTMLResponse:
+    """Resolve a ticker by symbol, or return the route's 404 not-found partial."""
+    upper = symbol.upper()
+    ticker = repo.get_by_symbol(db, upper)
+    if not ticker:
+        return templates.TemplateResponse(
+            request,
+            not_found_template,
+            {"ticker": upper},
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    return ticker
+
+
 @router.get("/ui/tickers/{symbol}/articles", response_class=HTMLResponse)
 def ui_ticker_articles(
     request: Request,
@@ -232,21 +242,16 @@ def ui_ticker_articles(
     offset: Annotated[int, Query(ge=0)] = 0,
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
-    upper = symbol.upper()
-    ticker = repo.get_by_symbol(db, upper)
-    if not ticker:
-        return templates.TemplateResponse(
-            request,
-            "_articles_not_found.html",
-            {"ticker": upper},
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    result = _lookup_or_not_found(request, db, symbol, "_articles_not_found.html")
+    if isinstance(result, HTMLResponse):
+        return result
+    ticker = result
 
     rows, total = repo.get_articles_page(db, ticker.id, limit=limit, offset=offset)
     return templates.TemplateResponse(
         request,
         "_articles.html",
-        _build_articles_context(upper, rows, total, limit=limit, offset=offset),
+        _build_articles_context(ticker.symbol, rows, total, limit=limit, offset=offset),
     )
 
 
@@ -256,20 +261,16 @@ def ui_ticker_chart(
     symbol: str,
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
-    upper = symbol.upper()
-    ticker = repo.get_by_symbol(db, upper)
-    if not ticker:
-        return templates.TemplateResponse(
-            request,
-            "_chart_not_found.html",
-            {"ticker": upper},
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
-    prices = repo.get_price_history(db, ticker.id, limit=_CHART_HISTORY_LIMIT)
+    result = _lookup_or_not_found(request, db, symbol, "_chart_not_found.html")
+    if isinstance(result, HTMLResponse):
+        return result
+    ticker = result
+
+    prices = repo.get_price_history(db, ticker.id, limit=repo.PRICE_HISTORY_LIMIT)
     return templates.TemplateResponse(
         request,
         "_chart.html",
-        _build_chart_context(db, ticker.id, upper, prices, _chart_refresh_seconds()),
+        _build_chart_context(db, ticker.id, ticker.symbol, prices, _chart_refresh_seconds()),
     )
 
 
@@ -279,18 +280,16 @@ def ui_ticker_view(
     symbol: str,
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
-    upper = symbol.upper()
-    ticker = repo.get_by_symbol(db, upper)
-    if not ticker:
-        return templates.TemplateResponse(
-            request,
-            "_chart_not_found.html",
-            {"ticker": upper},
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
-    prices = repo.get_price_history(db, ticker.id, limit=_CHART_HISTORY_LIMIT)
+    result = _lookup_or_not_found(request, db, symbol, "_view_not_found.html")
+    if isinstance(result, HTMLResponse):
+        return result
+    ticker = result
+
+    prices = repo.get_price_history(db, ticker.id, limit=repo.PRICE_HISTORY_LIMIT)
     rows, total = repo.get_articles_page(db, ticker.id, limit=_ARTICLES_INITIAL_LIMIT, offset=0)
-    context = _build_chart_context(db, ticker.id, upper, prices, _chart_refresh_seconds()) | (
-        _build_articles_context(upper, rows, total, limit=_ARTICLES_INITIAL_LIMIT, offset=0)
+    context = _build_chart_context(
+        db, ticker.id, ticker.symbol, prices, _chart_refresh_seconds()
+    ) | (
+        _build_articles_context(ticker.symbol, rows, total, limit=_ARTICLES_INITIAL_LIMIT, offset=0)
     )
     return templates.TemplateResponse(request, "_ticker_view.html", context)

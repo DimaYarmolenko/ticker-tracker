@@ -358,6 +358,9 @@ def test_get_view_unknown_ticker_returns_404(client):
     response = client.get("/ui/tickers/UNKNOWN/view")
     assert response.status_code == 404
     assert "UNKNOWN not found" in response.text
+    # Pane must stay coherent (chart + articles), not collapse to a lone chart box.
+    assert 'id="chart"' in response.text
+    assert 'id="articles"' in response.text
 
 
 def test_sidebar_button_targets_view_route(client, seeded_tickers):
