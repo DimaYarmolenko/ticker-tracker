@@ -28,7 +28,8 @@ def get_article_by_url(db: Session, url: str) -> Article | None:
 def get_evaluated_articles_for_chart(
     db: Session, ticker_id: str, *, since: datetime, limit: int = _CHART_MARKER_LIMIT
 ) -> list[tuple[Article, ArticleTicker]]:
-    # `since` must be naive UTC to match Article.published_at's column type (DateTime, no tz).
+    # `since` is tz-aware, matching Article.published_at's TIMESTAMPTZ column; the
+    # `>=` comparison below is aware-vs-aware.
 
     stmt = (
         sa_select(Article, ArticleTicker)

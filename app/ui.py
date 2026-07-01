@@ -99,11 +99,9 @@ def _build_chart_context(
     points: list[ChartPoint] = [ChartPoint(t=_to_epoch_ms(p.fetched_at), p=p.price) for p in prices]
     markers: list[ChartMarker] = []
     if prices:
-        # Article.published_at is a naive DateTime column; normalize to naive UTC
-        # so the repo's >= comparison stays on the same type.
+        # Both Price.fetched_at and Article.published_at are tz-aware, so the
+        # repo's >= comparison is aware-vs-aware — pass the timestamp straight through.
         since = prices[0].fetched_at
-        if since.tzinfo is not None:
-            since = since.astimezone(timezone.utc).replace(tzinfo=None)
         evaluated = repo.get_evaluated_articles_for_chart(db, ticker_id, since=since)
         markers = _build_chart_markers(prices, evaluated)
     return {
