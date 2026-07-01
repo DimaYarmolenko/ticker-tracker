@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ticker-tracker
+spec:
+  ingressClassName: traefik
+  rules:
+    # No host -> catch-all: serves any Host header, so the raw node IP
+    # (http://192.168.0.100/) works in a browser as well as ticker.mimir.local.
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app
+                port:
+                  number: 80
