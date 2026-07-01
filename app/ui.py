@@ -1,5 +1,4 @@
 import bisect
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, TypedDict
@@ -11,6 +10,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 import app.repository as repo
+from app.config import read_int_env
 from app.database import get_db
 from app.models import Article, ArticleTicker, ImpactLabel, Price
 from app.schemas import TickerCreate
@@ -44,10 +44,7 @@ class ChartMarker(TypedDict):
 
 
 def _chart_refresh_seconds() -> int:
-    try:
-        minutes = int(os.getenv("PRICE_POLL_INTERVAL_MINUTES", "30"))
-    except ValueError:
-        minutes = 30
+    minutes = read_int_env("PRICE_POLL_INTERVAL_MINUTES", required=False, default=30)
     return max(_MIN_REFRESH_SECONDS, minutes * 60)
 
 
