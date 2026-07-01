@@ -10,6 +10,7 @@ from app.repository.evaluation import (
     save_evaluations,
 )
 from app.repository.price import (
+    PRICE_HISTORY_LIMIT,
     PriceData,
     get_price_history,
     get_prices_page,
@@ -18,6 +19,7 @@ from app.repository.price import (
 from app.repository.ticker import create, delete, get_all, get_by_symbol
 
 __all__ = [
+    "PRICE_HISTORY_LIMIT",
     "ArticleData",
     "PriceData",
     "create",

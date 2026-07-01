@@ -21,7 +21,6 @@ _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
 
-_CHART_HISTORY_LIMIT = 2000
 _ARTICLES_INITIAL_LIMIT = 20
 _MIN_REFRESH_SECONDS = 60
 _IMPORTANT_IMPORTANCE_THRESHOLD = 4
@@ -262,7 +261,7 @@ def ui_ticker_chart(
             {"ticker": upper},
             status_code=status.HTTP_404_NOT_FOUND,
         )
-    prices = repo.get_price_history(db, ticker.id, limit=_CHART_HISTORY_LIMIT)
+    prices = repo.get_price_history(db, ticker.id, limit=repo.PRICE_HISTORY_LIMIT)
     return templates.TemplateResponse(
         request,
         "_chart.html",
@@ -285,7 +284,7 @@ def ui_ticker_view(
             {"ticker": upper},
             status_code=status.HTTP_404_NOT_FOUND,
         )
-    prices = repo.get_price_history(db, ticker.id, limit=_CHART_HISTORY_LIMIT)
+    prices = repo.get_price_history(db, ticker.id, limit=repo.PRICE_HISTORY_LIMIT)
     rows, total = repo.get_articles_page(db, ticker.id, limit=_ARTICLES_INITIAL_LIMIT, offset=0)
     context = _build_chart_context(db, ticker.id, upper, prices, _chart_refresh_seconds()) | (
         _build_articles_context(upper, rows, total, limit=_ARTICLES_INITIAL_LIMIT, offset=0)

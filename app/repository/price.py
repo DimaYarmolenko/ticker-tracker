@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from app.models import Price, Ticker
 from app.repository._pagination import paginate
 
+PRICE_HISTORY_LIMIT = 2000
+
 
 class PriceData(TypedDict):
     symbol: str
@@ -28,7 +30,7 @@ def get_prices_page(
     return [row[0] for row in rows], total
 
 
-def get_price_history(db: Session, ticker_id: str, limit: int = 2000) -> list[Price]:
+def get_price_history(db: Session, ticker_id: str, limit: int = PRICE_HISTORY_LIMIT) -> list[Price]:
     stmt = (
         sa_select(Price)
         .where(Price.ticker_id == ticker_id)
