@@ -77,35 +77,3 @@ class Price(Base):
     ticker: Mapped["Ticker"] = relationship("Ticker", back_populates="prices")
 
     __table_args__ = (Index("ix_prices_ticker_fetched", "ticker_id", "fetched_at"),)
-
-
-class User(Base):
-    __tablename__ = "users"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    email: Mapped[str] = mapped_column(String(254), unique=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
-    )
-    subscriptions: Mapped[list["UserTicker"]] = relationship(
-        "UserTicker", back_populates="user", cascade="all, delete-orphan"
-    )
-
-
-class UserTicker(Base):
-    __tablename__ = "user_tickers"
-
-    user_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
-    ticker_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("tickers.id", ondelete="CASCADE"), primary_key=True
-    )
-    subscribed_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
-    )
-    user: Mapped["User"] = relationship("User", back_populates="subscriptions")
-    ticker: Mapped["Ticker"] = relationship("Ticker")
-
-    __table_args__ = (Index("ix_user_tickers_user", "user_id"),)

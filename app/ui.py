@@ -11,9 +11,8 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 import app.repository as repo
-from app.auth import current_user_or_redirect
 from app.database import get_db
-from app.models import Article, ArticleTicker, ImpactLabel, Price, User
+from app.models import Article, ArticleTicker, ImpactLabel, Price
 from app.schemas import TickerCreate
 
 router = APIRouter()
@@ -155,13 +154,12 @@ def _build_articles_context(
 def _render_tickers(
     request: Request,
     db: Session,
-    user: User,
     *,
     error: str | None = None,
     selected: str | None = None,
     form_value: str | None = None,
 ) -> HTMLResponse:
-    tickers = repo.list_subscribed_tickers(db, user.id)
+    tickers = repo.get_all(db)
     return templates.TemplateResponse(
         request,
         "_tickers.html",
@@ -170,52 +168,29 @@ def _render_tickers(
             "selected": selected,
             "error": error,
             "form_value": form_value,
-            "current_user": user,
         },
     )
 
 
-def _resolve_subscribed_ticker(db: Session, user: User, symbol: str):
-    ticker = repo.get_by_symbol(db, symbol)
-    if ticker is None or not repo.is_subscribed(db, user.id, ticker.id):
-        return None
-    return ticker
-
-
 @router.get("/", response_class=HTMLResponse)
-def index(
-    request: Request,
-    user: User = Depends(current_user_or_redirect),
-    db: Session = Depends(get_db),
-) -> HTMLResponse:
-    tickers = repo.list_subscribed_tickers(db, user.id)
+def index(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+    tickers = repo.get_all(db)
     return templates.TemplateResponse(
         request,
         "index.html",
-        {
-            "tickers": tickers,
-            "selected": None,
-            "error": None,
-            "form_value": None,
-            "current_user": user,
-        },
+        {"tickers": tickers, "selected": None, "error": None, "form_value": None},
     )
 
 
 @router.get("/ui/tickers", response_class=HTMLResponse)
-def ui_tickers(
-    request: Request,
-    user: User = Depends(current_user_or_redirect),
-    db: Session = Depends(get_db),
-) -> HTMLResponse:
-    return _render_tickers(request, db, user)
+def ui_tickers(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+    return _render_tickers(request, db)
 
 
 @router.post("/ui/tickers", response_class=HTMLResponse)
 def ui_add_ticker(
     request: Request,
     symbol: Annotated[str, Form()],
-    user: User = Depends(current_user_or_redirect),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     try:
@@ -225,32 +200,28 @@ def ui_add_ticker(
         # Pydantic v2 prefixes user messages with "Value error, "; trim it.
         if msg.startswith("Value error, "):
             msg = msg[len("Value error, ") :]
-        return _render_tickers(request, db, user, error=msg, form_value=symbol)
+        return _render_tickers(request, db, error=msg, form_value=symbol)
 
-    ticker = repo.get_or_create(db, payload.symbol)
-    if not repo.subscribe(db, user.id, ticker):
+    if repo.get_by_symbol(db, payload.symbol):
         return _render_tickers(
             request,
             db,
-            user,
             error=f"{payload.symbol} is already tracked",
             form_value=payload.symbol,
         )
-    return _render_tickers(request, db, user, selected=payload.symbol)
+
+    repo.create(db, payload.symbol)
+    return _render_tickers(request, db, selected=payload.symbol)
 
 
 @router.delete("/ui/tickers/{symbol}", response_class=HTMLResponse)
-def ui_delete_ticker(
-    request: Request,
-    symbol: str,
-    user: User = Depends(current_user_or_redirect),
-    db: Session = Depends(get_db),
-) -> HTMLResponse:
+def ui_delete_ticker(request: Request, symbol: str, db: Session = Depends(get_db)) -> HTMLResponse:
     upper = symbol.upper()
     ticker = repo.get_by_symbol(db, upper)
-    if not ticker or not repo.unsubscribe(db, user.id, ticker.id):
-        return _render_tickers(request, db, user, error=f"{upper} not found")
-    return _render_tickers(request, db, user)
+    if not ticker:
+        return _render_tickers(request, db, error=f"{upper} not found")
+    repo.delete(db, ticker)
+    return _render_tickers(request, db)
 
 
 @router.get("/ui/tickers/{symbol}/articles", response_class=HTMLResponse)
@@ -259,11 +230,10 @@ def ui_ticker_articles(
     symbol: str,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
-    user: User = Depends(current_user_or_redirect),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     upper = symbol.upper()
-    ticker = _resolve_subscribed_ticker(db, user, upper)
+    ticker = repo.get_by_symbol(db, upper)
     if not ticker:
         return templates.TemplateResponse(
             request,
@@ -284,11 +254,10 @@ def ui_ticker_articles(
 def ui_ticker_chart(
     request: Request,
     symbol: str,
-    user: User = Depends(current_user_or_redirect),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     upper = symbol.upper()
-    ticker = _resolve_subscribed_ticker(db, user, upper)
+    ticker = repo.get_by_symbol(db, upper)
     if not ticker:
         return templates.TemplateResponse(
             request,
@@ -308,11 +277,10 @@ def ui_ticker_chart(
 def ui_ticker_view(
     request: Request,
     symbol: str,
-    user: User = Depends(current_user_or_redirect),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     upper = symbol.upper()
-    ticker = _resolve_subscribed_ticker(db, user, upper)
+    ticker = repo.get_by_symbol(db, upper)
     if not ticker:
         return templates.TemplateResponse(
             request,
