@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 import app.repository as repo
 from app.config import read_int_env
 from app.database import get_db
-from app.models import Article, ArticleTicker, ImpactLabel, Price
+from app.models import Article, ArticleTicker, ImpactLabel, Price, Ticker
 from app.schemas import TickerCreate
 
 router = APIRouter()
@@ -220,6 +220,22 @@ def ui_delete_ticker(request: Request, symbol: str, db: Session = Depends(get_db
     return _render_tickers(request, db)
 
 
+def _lookup_or_not_found(
+    request: Request, db: Session, symbol: str, not_found_template: str
+) -> Ticker | HTMLResponse:
+    """Resolve a ticker by symbol, or return the route's 404 not-found partial."""
+    upper = symbol.upper()
+    ticker = repo.get_by_symbol(db, upper)
+    if not ticker:
+        return templates.TemplateResponse(
+            request,
+            not_found_template,
+            {"ticker": upper},
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    return ticker
+
+
 @router.get("/ui/tickers/{symbol}/articles", response_class=HTMLResponse)
 def ui_ticker_articles(
     request: Request,
@@ -228,21 +244,16 @@ def ui_ticker_articles(
     offset: Annotated[int, Query(ge=0)] = 0,
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
-    upper = symbol.upper()
-    ticker = repo.get_by_symbol(db, upper)
-    if not ticker:
-        return templates.TemplateResponse(
-            request,
-            "_articles_not_found.html",
-            {"ticker": upper},
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    result = _lookup_or_not_found(request, db, symbol, "_articles_not_found.html")
+    if isinstance(result, HTMLResponse):
+        return result
+    ticker = result
 
     rows, total = repo.get_articles_page(db, ticker.id, limit=limit, offset=offset)
     return templates.TemplateResponse(
         request,
         "_articles.html",
-        _build_articles_context(upper, rows, total, limit=limit, offset=offset),
+        _build_articles_context(ticker.symbol, rows, total, limit=limit, offset=offset),
     )
 
 
@@ -252,20 +263,16 @@ def ui_ticker_chart(
     symbol: str,
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
-    upper = symbol.upper()
-    ticker = repo.get_by_symbol(db, upper)
-    if not ticker:
-        return templates.TemplateResponse(
-            request,
-            "_chart_not_found.html",
-            {"ticker": upper},
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    result = _lookup_or_not_found(request, db, symbol, "_chart_not_found.html")
+    if isinstance(result, HTMLResponse):
+        return result
+    ticker = result
+
     prices = repo.get_price_history(db, ticker.id, limit=repo.PRICE_HISTORY_LIMIT)
     return templates.TemplateResponse(
         request,
         "_chart.html",
-        _build_chart_context(db, ticker.id, upper, prices, _chart_refresh_seconds()),
+        _build_chart_context(db, ticker.id, ticker.symbol, prices, _chart_refresh_seconds()),
     )
 
 
@@ -275,18 +282,16 @@ def ui_ticker_view(
     symbol: str,
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
-    upper = symbol.upper()
-    ticker = repo.get_by_symbol(db, upper)
-    if not ticker:
-        return templates.TemplateResponse(
-            request,
-            "_view_not_found.html",
-            {"ticker": upper},
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    result = _lookup_or_not_found(request, db, symbol, "_view_not_found.html")
+    if isinstance(result, HTMLResponse):
+        return result
+    ticker = result
+
     prices = repo.get_price_history(db, ticker.id, limit=repo.PRICE_HISTORY_LIMIT)
     rows, total = repo.get_articles_page(db, ticker.id, limit=_ARTICLES_INITIAL_LIMIT, offset=0)
-    context = _build_chart_context(db, ticker.id, upper, prices, _chart_refresh_seconds()) | (
-        _build_articles_context(upper, rows, total, limit=_ARTICLES_INITIAL_LIMIT, offset=0)
+    context = _build_chart_context(
+        db, ticker.id, ticker.symbol, prices, _chart_refresh_seconds()
+    ) | (
+        _build_articles_context(ticker.symbol, rows, total, limit=_ARTICLES_INITIAL_LIMIT, offset=0)
     )
     return templates.TemplateResponse(request, "_ticker_view.html", context)
