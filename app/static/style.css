@@ -37,74 +37,12 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
 .topbar h1 {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.2px;
 }
-.topbar-user {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 13px;
-  color: var(--muted);
-}
-.topbar-user .user-email { color: var(--text); }
-.logout-form { margin: 0; }
-.logout-form button {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: 4px 10px;
-  border-radius: var(--radius);
-  font-size: 13px;
-  cursor: pointer;
-}
-.logout-form button:hover { border-color: var(--accent); color: var(--accent); }
-
-.auth-pane {
-  max-width: 360px;
-  margin: 48px auto;
-  padding: 24px 32px;
-}
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 24px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-.auth-form h2 { margin: 0 0 4px; font-size: 18px; font-weight: 600; }
-.auth-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
-.auth-form label input {
-  padding: 8px 10px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  font-size: 14px;
-}
-.auth-form label input:focus { border-color: var(--accent); outline: none; }
-.auth-form button[type="submit"] {
-  padding: 8px 10px;
-  background: var(--accent);
-  color: white;
-  border: 0;
-  border-radius: var(--radius);
-  font-size: 14px;
-  cursor: pointer;
-}
-.auth-form button[type="submit"]:hover { background: var(--accent-hover); }
-.auth-alt { margin: 0; font-size: 13px; color: var(--muted); text-align: center; }
 
 .layout {
   display: grid;

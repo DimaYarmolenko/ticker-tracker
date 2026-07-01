@@ -1,20 +1,14 @@
 import logging
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, AsyncGenerator
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
-from fastapi.responses import RedirectResponse, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
-from starlette.middleware.sessions import SessionMiddleware
 
 import app.repository as repo
-from app.auth import AuthRedirect, current_user
-from app.auth_routes import router as auth_router
 from app.database import get_db
-from app.models import User
 from app.scheduler import start_scheduler, stop_scheduler
 from app.schemas import (
     ArticleListResponse,
@@ -41,82 +35,47 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
-_SESSION_SECRET = os.environ["SESSION_SECRET_KEY"]
-
-
-def _env_bool(name: str, *, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
-_SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", default=False)
 
 app = FastAPI(title="Ticker Tracker", lifespan=lifespan)
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=_SESSION_SECRET,
-    same_site="lax",
-    https_only=_SESSION_COOKIE_SECURE,
-)
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
-app.include_router(auth_router)
 app.include_router(ui_router)
 
 
-@app.exception_handler(AuthRedirect)
-def _handle_auth_redirect(request: Request, _exc: AuthRedirect) -> Response:
-    if request.headers.get("HX-Request") == "true":
-        return Response(status_code=status.HTTP_204_NO_CONTENT, headers={"HX-Redirect": "/login"})
-    return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
-
-
 @app.get("/tickers", response_model=list[TickerResponse])
-def list_tickers(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    return repo.list_subscribed_tickers(db, user.id)
+def list_tickers(db: Session = Depends(get_db)):
+    return repo.get_all(db)
 
 
 @app.post("/tickers", response_model=TickerResponse, status_code=status.HTTP_201_CREATED)
-def add_ticker(
-    payload: TickerCreate,
-    user: User = Depends(current_user),
-    db: Session = Depends(get_db),
-):
-    ticker = repo.get_or_create(db, payload.symbol)
-    if not repo.subscribe(db, user.id, ticker):
+def add_ticker(payload: TickerCreate, db: Session = Depends(get_db)):
+    if repo.get_by_symbol(db, payload.symbol):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"{payload.symbol} already exists",
         )
-    return ticker
+    return repo.create(db, payload.symbol)
 
 
 @app.delete("/tickers/{symbol}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_ticker(
-    symbol: str,
-    user: User = Depends(current_user),
-    db: Session = Depends(get_db),
-):
-    symbol = symbol.upper()
-    ticker = repo.get_by_symbol(db, symbol)
-    if not ticker or not repo.unsubscribe(db, user.id, ticker.id):
+def delete_ticker(symbol: str, db: Session = Depends(get_db)):
+    ticker = repo.get_by_symbol(db, symbol.upper())
+    if not ticker:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"{symbol} not found",
+            detail=f"{symbol.upper()} not found",
         )
+    repo.delete(db, ticker)
 
 
 @app.get("/tickers/{symbol}/news", response_model=ArticleListResponse)
 def get_ticker_news(
     symbol: str,
     pagination: Annotated[PaginationParams, Query()],
-    user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     symbol = symbol.upper()
     ticker = repo.get_by_symbol(db, symbol)
-    if not ticker or not repo.is_subscribed(db, user.id, ticker.id):
+    if not ticker:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"{symbol} not found",
@@ -152,12 +111,11 @@ def get_ticker_news(
 def get_ticker_prices(
     symbol: str,
     pagination: Annotated[PaginationParams, Query()],
-    user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     symbol = symbol.upper()
     ticker = repo.get_by_symbol(db, symbol)
-    if not ticker or not repo.is_subscribed(db, user.id, ticker.id):
+    if not ticker:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"{symbol} not found",

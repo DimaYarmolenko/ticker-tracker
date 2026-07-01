@@ -133,8 +133,7 @@ class TestInsertPricesRepository:
         )
         assert db_session.query(Price).count() == 1
         ticker = repo.get_by_symbol(db_session, "AAPL")
-        db_session.delete(ticker)
-        db_session.commit()
+        repo.delete(db_session, ticker)
         assert db_session.query(Price).count() == 0
 
 
