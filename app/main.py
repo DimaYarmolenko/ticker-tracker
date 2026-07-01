@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 import app.repository as repo
 from app.database import get_db
+from app.models import Ticker
 from app.scheduler import start_scheduler, stop_scheduler
 from app.schemas import (
     ArticleListResponse,
@@ -41,6 +42,17 @@ app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 app.include_router(ui_router)
 
 
+def get_ticker_or_404(symbol: str, db: Session = Depends(get_db)) -> Ticker:
+    symbol = symbol.upper()
+    ticker = repo.get_by_symbol(db, symbol)
+    if not ticker:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{symbol} not found",
+        )
+    return ticker
+
+
 @app.get("/tickers", response_model=list[TickerResponse])
 def list_tickers(db: Session = Depends(get_db)):
     return repo.get_all(db)
@@ -57,34 +69,24 @@ def add_ticker(payload: TickerCreate, db: Session = Depends(get_db)):
 
 
 @app.delete("/tickers/{symbol}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_ticker(symbol: str, db: Session = Depends(get_db)):
-    ticker = repo.get_by_symbol(db, symbol.upper())
-    if not ticker:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"{symbol.upper()} not found",
-        )
+def delete_ticker(
+    ticker: Annotated[Ticker, Depends(get_ticker_or_404)],
+    db: Session = Depends(get_db),
+):
     repo.delete(db, ticker)
 
 
 @app.get("/tickers/{symbol}/news", response_model=ArticleListResponse)
 def get_ticker_news(
-    symbol: str,
+    ticker: Annotated[Ticker, Depends(get_ticker_or_404)],
     pagination: Annotated[PaginationParams, Query()],
     db: Session = Depends(get_db),
 ):
-    symbol = symbol.upper()
-    ticker = repo.get_by_symbol(db, symbol)
-    if not ticker:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"{symbol} not found",
-        )
     rows, total = repo.get_articles_page(
         db, ticker.id, limit=pagination.limit, offset=pagination.offset
     )
     return ArticleListResponse(
-        ticker=symbol,
+        ticker=ticker.symbol,
         total=total,
         limit=pagination.limit,
         offset=pagination.offset,
@@ -109,22 +111,15 @@ def get_ticker_news(
 
 @app.get("/tickers/{symbol}/prices", response_model=PriceListResponse)
 def get_ticker_prices(
-    symbol: str,
+    ticker: Annotated[Ticker, Depends(get_ticker_or_404)],
     pagination: Annotated[PaginationParams, Query()],
     db: Session = Depends(get_db),
 ):
-    symbol = symbol.upper()
-    ticker = repo.get_by_symbol(db, symbol)
-    if not ticker:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"{symbol} not found",
-        )
     prices, total = repo.get_prices_page(
         db, ticker.id, limit=pagination.limit, offset=pagination.offset
     )
     return PriceListResponse(
-        ticker=symbol,
+        ticker=ticker.symbol,
         total=total,
         limit=pagination.limit,
         offset=pagination.offset,
